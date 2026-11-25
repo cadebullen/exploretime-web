@@ -264,7 +264,7 @@ function placesForDay(ranked, dayIndex, dayCount) {
     .slice(0, PER_BLOCK);
 }
 
-function PlaceCard({ place, isSaved, onToggle }) {
+function PlaceCard({ place, isSaved, otherDays = [], onToggle }) {
   const price = priceLabel(place.priceLevel);
   return (
     <li className="rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden flex flex-col">
@@ -301,6 +301,11 @@ function PlaceCard({ place, isSaved, onToggle }) {
         <p className="text-xs text-white/35 mt-1 line-clamp-2">
           {place.address}
         </p>
+        {otherDays.length > 0 && (
+          <p className="mt-3 inline-flex self-start items-center gap-1.5 rounded-md bg-[#FF9F43]/15 px-2 py-1 text-xs font-medium text-[#FFC48A]">
+            Already planned for Day {otherDays.join(", Day ")}
+          </p>
+        )}
         <div className="mt-auto pt-4 flex items-center gap-2">
           <button
             type="button"
@@ -336,6 +341,7 @@ export default function DayActivities({
   dayIndex = 0,
   dayCount = 1,
   saved = [],
+  plannedElsewhere = {},
   onToggleSave,
   profile,
   onSaveProfile,
@@ -717,6 +723,7 @@ export default function DayActivities({
                             key={place.id}
                             place={place}
                             isSaved={savedIds.has(place.id)}
+                            otherDays={plannedElsewhere[place.id]}
                             onToggle={onToggleSave}
                           />
                         ))}

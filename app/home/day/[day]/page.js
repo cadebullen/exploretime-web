@@ -27,6 +27,7 @@ export default function DayDetailsPage() {
   const [trip, setTrip] = useState(null);
   const [days, setDays] = useState([]);
   const [saved, setSaved] = useState([]); // places added to this day
+  const [plannedElsewhere, setPlannedElsewhere] = useState({}); // place id -> [day numbers]
   const [profile, setProfile] = useState(null);
   const [places, setPlaces] = useState([]);
   const [placesLoading, setPlacesLoading] = useState(false);
@@ -58,6 +59,17 @@ export default function DayDetailsPage() {
     // Older versions saved ids of generic suggestions; keep only real places.
     const stored = getDayActivities(t, dayKey(selected.date));
     setSaved(stored.filter((item) => item && typeof item === "object"));
+
+    // Which places are already planned on the trip's other days.
+    const elsewhere = {};
+    allDays.forEach((d, i) => {
+      if (i === dayNumber - 1) return;
+      getDayActivities(t, dayKey(d.date)).forEach((item) => {
+        if (!item || typeof item !== "object") return;
+        (elsewhere[item.id] ??= []).push(i + 1);
+      });
+    });
+    setPlannedElsewhere(elsewhere);
     setProfile(getTripActivityProfile(t));
   }, [dayNumber, router]);
 
@@ -181,6 +193,7 @@ export default function DayDetailsPage() {
           dayIndex={dayNumber - 1}
           dayCount={days.length}
           saved={saved}
+          plannedElsewhere={plannedElsewhere}
           onToggleSave={toggleSave}
           profile={profile}
           onSaveProfile={handleSaveProfile}
