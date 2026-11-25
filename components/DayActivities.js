@@ -276,14 +276,15 @@ function PlaceCard({ place, date, isSaved, otherDays = [], onToggle }) {
       : null;
   return (
     <li className="rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden flex flex-col">
-      <div className="aspect-[16/9] bg-white/5">
+      {/* Fixed-height photo so every card has the same shape */}
+      <div className="relative h-44 shrink-0 overflow-hidden bg-white/5">
         {photoSrc && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={photoSrc}
             alt=""
             loading="lazy"
-            className="w-full h-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover"
           />
         )}
       </div>
@@ -292,41 +293,56 @@ function PlaceCard({ place, date, isSaved, otherDays = [], onToggle }) {
           {place.category}
           {price && <span className="ml-2 text-white/60">{price}</span>}
         </p>
-        <h4 className="text-base font-semibold text-white mt-1 leading-snug">
+        <h4
+          className="text-base font-semibold text-white mt-1 leading-snug line-clamp-2 min-h-[2.75rem]"
+          title={place.name}
+        >
           {place.name}
         </h4>
-        {place.rating && (
-          <p className="text-xs text-white/60 mt-1">
-            ★ {place.rating.toFixed(1)}
-            {place.ratingCount > 0 && (
-              <span className="text-white/35">
-                {" "}
-                ({place.ratingCount.toLocaleString()})
-              </span>
-            )}
-          </p>
-        )}
-        {hours && (
-          <p className="text-xs text-white/60 mt-1">
-            {hours}
-            {date && (
-              <span className="text-white/35">
-                {" "}
-                on{" "}
-                {date.toLocaleDateString("en-US", { weekday: "long" })}
-              </span>
-            )}
-          </p>
-        )}
-        <p className="text-xs text-white/35 mt-1 line-clamp-2">
+        <p className="text-xs text-white/60 mt-1 h-4">
+          {place.rating ? (
+            <>
+              ★ {place.rating.toFixed(1)}
+              {place.ratingCount > 0 && (
+                <span className="text-white/35">
+                  {" "}
+                  ({place.ratingCount.toLocaleString()})
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-white/35">No ratings yet</span>
+          )}
+        </p>
+        <p className="text-xs mt-1 h-4 truncate">
+          {hours ? (
+            <>
+              <span className="text-white/60">{hours}</span>
+              {date && (
+                <span className="text-white/35">
+                  {" "}
+                  on {date.toLocaleDateString("en-US", { weekday: "long" })}
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-white/35">Hours not listed</span>
+          )}
+        </p>
+        <p
+          className="text-xs text-white/35 mt-1 line-clamp-2 min-h-[2rem]"
+          title={place.address}
+        >
           {place.address}
         </p>
-        {otherDays.length > 0 && (
-          <p className="mt-3 inline-flex self-start items-center gap-1.5 rounded-md bg-[#FF9F43]/15 px-2 py-1 text-xs font-medium text-[#FFC48A]">
-            Already planned for Day {otherDays.join(", Day ")}
-          </p>
-        )}
-        <div className="mt-auto pt-4 flex items-center gap-2">
+        <p className="mt-3 h-6">
+          {otherDays.length > 0 && (
+            <span className="inline-flex items-center rounded-md bg-[#FF9F43]/15 px-2 py-1 text-xs font-medium text-[#FFC48A]">
+              Already planned for Day {otherDays.join(", Day ")}
+            </span>
+          )}
+        </p>
+        <div className="mt-auto pt-3 flex items-center gap-2">
           <button
             type="button"
             onClick={() => onToggle(place)}
