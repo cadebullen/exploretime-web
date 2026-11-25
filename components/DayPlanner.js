@@ -7,6 +7,7 @@ import StartPointPicker from "@/components/StartPointPicker";
 import AddPlacePicker from "@/components/AddPlacePicker";
 import { availabilityAt, formatClock, TIME_RANGE_LABELS } from "@/lib/openingHours";
 import { buildTimeline } from "@/lib/timeline";
+import { buildIcs, estimateSpend } from "@/lib/dayExport";
 import { orderPlan, shortestOrder, isShortestOrder } from "@/lib/planOrder";
 
 // True on screens at least `lg` (1024px) wide.
@@ -35,10 +36,25 @@ export default function DayPlanner({
   date = null, // the day's date
   dayStartMin = 9 * 60, // when the day starts, minutes after midnight
   onDayStartChange = () => {},
+  blockWeather = null, // { Morning: { icon, temp, rainChance }, … } when forecast
+  travelMode = "BEST", // default for every leg
+  legModes = {}, // { [from stop id]: mode } per-leg choices
+  onTravelChange = () => {}, // ({ travelMode, legModes }) => void
+  tripDays = [], // [{ n, label }] for "move / copy to day"
+  dayNumber = 1,
+  onMoveToDay = () => {}, // (place, dayNumber, copy) => void
+  tripName = "",
 }) {
   const ordered = useMemo(() => orderPlan(plan), [plan]);
   const [selectedId, setSelectedId] = useState(null);
-  const [mode, setMode] = useState("WALK");
+  const mode = travelMode;
+  const setMode = (m) => onTravelChange({ travelMode: m, legModes: {} });
+  const setLegMode = (fromId, m) => {
+    const next = { ...legModes };
+    if (!m || m === travelMode) delete next[fromId];
+    else next[fromId] = m;
+    onTravelChange({ travelMode, legModes: next });
+  };
   const [route, setRoute] = useState(null);
   const [routeError, setRouteError] = useState(null);
   const [pickingStart, setPickingStart] = useState(false);
@@ -85,6 +101,21 @@ export default function DayPlanner({
     ],
     [ordered, start],
   );
+  const legModesKey = JSON.stringify(legModes);
+  const dateKey = date ? date.toDateString() : "";
+  // Rough departure time for a leg, for transit timetables: an hour into the
+  // time of day of the place you're leaving (the start leaves at the day's
+  // start time).
+  const departureFor = (p) => {
+    if (!date) return undefined;
+    const d = new Date(date);
+    const min =
+      p.id === "start"
+        ? dayStartMin
+        : { Morning: 9 * 60, Afternoon: 13 * 60, Evening: 18 * 60 }[p.timeBlock] ?? 12 * 60;
+    d.setHours(Math.floor(min / 60), min % 60, 0, 0);
+    return d.toISOString();
+  };
   const stopsKey = stops
     .map((p) => `${p.location.lat},${p.location.lng}`)
     .join("|");
@@ -99,7 +130,19 @@ export default function DayPlanner({
     fetch("/api/route", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stops: stops.map((p) => p.location), mode }),
+      body: JSON.stringify({
+        stops: stops.map((p) => p.location),
+        mode,
+        legModes: Object.fromEntries(
+          stops
+            .slice(0, -1)
+            .map((p, i) => [i, legModes[p.id]])
+            .filter(([, m]) => m),
+        ),
+        departures: Object.fromEntries(
+          stops.slice(0, -1).map((p, i) => [i, departureFor(p)]),
+        ),
+      }),
     })
       .then((r) => r.json())
       .then((d) => {
@@ -117,7 +160,7 @@ export default function DayPlanner({
     };
     // stopsKey captures the stops' order and positions
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stopsKey, mode]);
+  }, [stopsKey, mode, legModesKey, dateKey]);
 
   // Travel time from each place to the next one that has coordinates, and
   // whether that's a long way (over 45 minutes).
@@ -127,13 +170,15 @@ export default function DayPlanner({
     route.legs.forEach((leg, i) => {
       if (stops[i]) {
         out[stops[i].id] = {
-          label: legLabel(leg, mode),
+          label: legLabel(leg),
+          mode: leg.mode,
+          chosen: legModes[stops[i].id] ?? null,
           far: leg.durationSec > 45 * 60,
         };
       }
     });
     return out;
-  }, [route, stops, mode]);
+  }, [route, stops, legModes]);
   const anyFar = Object.values(legsByFromId).some((l) => l.far);
 
   // Rough timeline: arrival and leaving time at each stop.
@@ -144,10 +189,15 @@ export default function DayPlanner({
     });
     return out;
   }, [route, stops]);
-  const times = useMemo(
-    () => buildTimeline(ordered, (id) => travelToId[id] ?? 0, dayStartMin),
-    [ordered, travelToId, dayStartMin],
-  );
+  const times = useMemo(() => {
+    // When a place is still closed on arrival, when does it open?
+    const opensAt = (place, minute) => {
+      if (!date) return null;
+      const a = availabilityAt(place.hours, date, minute);
+      return a && !a.ok && a.reason === "not-open-yet" ? a.opensAt : null;
+    };
+    return buildTimeline(ordered, (id) => travelToId[id] ?? 0, dayStartMin, opensAt);
+  }, [ordered, travelToId, dayStartMin, date]);
 
   // Warnings: closed that day / at the arrival time, or running late.
   const issues = useMemo(() => {
@@ -157,7 +207,9 @@ export default function DayPlanner({
       const t = times[p.id];
       if (!t) continue;
       const a = date ? availabilityAt(p.hours, date, t.arrive) : null;
-      if (a && !a.ok) {
+      if (t.late) {
+        out[p.id] = `You'd get here around ${formatClock(t.arrive)}, ${t.late} min after ${formatClock(p.fixedTime)}`;
+      } else if (a && !a.ok) {
         out[p.id] =
           a.reason === "closed-day"
             ? `Closed on ${weekday}s`
@@ -178,10 +230,26 @@ export default function DayPlanner({
     if (ordered.some((p) => p.id === place.id)) return;
     onChangeRef.current([...ordered, place]);
   };
-  const changeDuration = (id, durationMin) =>
+  const spend = useMemo(() => estimateSpend(ordered), [ordered]);
+
+  const downloadCalendar = () => {
+    if (!date) return;
+    const ics = buildIcs({ plan: ordered, times, date, tripName });
+    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(tripName || "trip").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-day-${dayNumber}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const updatePlace = (id, patch) =>
     onChangeRef.current(
-      ordered.map((p) => (p.id === id ? { ...p, durationMin } : p)),
+      ordered.map((p) => (p.id === id ? { ...p, ...patch } : p)),
     );
+  const changeDuration = (id, durationMin) => updatePlace(id, { durationMin });
 
   // Shortest order, with one step of undo.
   const [beforeShortest, setBeforeShortest] = useState(null);
@@ -221,7 +289,6 @@ export default function DayPlanner({
     <DayMap
       plan={ordered}
       start={start}
-      mode={mode}
       route={route}
       selectedId={selectedId}
       onSelect={handleSelect}
@@ -328,12 +395,14 @@ export default function DayPlanner({
   return (
     <div className="space-y-4">
       {/* Controls */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 text-sm">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 text-sm print:hidden">
         <div className="flex items-center gap-2">
           <span className="text-white/50">Travel by</span>
           {[
-            ["WALK", "Walking"],
-            ["DRIVE", "Driving"],
+            ["BEST", "Best"],
+            ["WALK", "Walk"],
+            ["TRANSIT", "Transit"],
+            ["DRIVE", "Drive"],
           ].map(([value, label]) => (
             <button
               key={value}
@@ -409,7 +478,7 @@ export default function DayPlanner({
           {anyFar && (
             <p className="text-xs text-[#FFC48A]">
               {mode === "WALK"
-                ? "Some stops are over 45 minutes apart on foot. Try Driving, reorder for the shortest route, or move far places to another day."
+                ? "Some stops are over 45 minutes apart on foot. Try Best or Drive, reorder for the shortest route, or move far places to another day."
                 : "Some stops are over 45 minutes apart. Reorder for the shortest route, or move far places to another day."}
             </p>
           )}
@@ -422,7 +491,49 @@ export default function DayPlanner({
         </div>
       )}
 
-      <div className="max-w-xl">{startSection}</div>
+      {ordered.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          <span className="text-white/70">
+            {spend.priced > 0 ? (
+              <>
+                Estimated spend:{" "}
+                <span className="font-semibold text-white">
+                  {spend.high === 0 ? "free" : `~$${spend.low}–$${spend.high}`}
+                </span>{" "}
+                per person
+                <span className="text-white/40">
+                  {" "}
+                  (rough, from Google price levels
+                  {spend.unpriced > 0
+                    ? `; ${spend.unpriced} place${spend.unpriced === 1 ? " has" : "s have"} no price info`
+                    : ""}
+                  )
+                </span>
+              </>
+            ) : (
+              <span className="text-white/40">No price info for these places yet.</span>
+            )}
+          </span>
+          <span className="ml-auto flex gap-2 print:hidden">
+            <button
+              type="button"
+              onClick={downloadCalendar}
+              className="rounded-lg border border-white/15 px-3 py-1.5 text-white/80 hover:text-white hover:border-white/30"
+            >
+              Add to calendar
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="rounded-lg border border-white/15 px-3 py-1.5 text-white/80 hover:text-white hover:border-white/30"
+            >
+              Print
+            </button>
+          </span>
+        </div>
+      )}
+
+      <div className="max-w-xl print:hidden">{startSection}</div>
 
       {/* Morning | Afternoon | Evening */}
       <DayPlan
@@ -435,12 +546,19 @@ export default function DayPlanner({
         times={times}
         issues={issues}
         onDurationChange={changeDuration}
+        blockWeather={blockWeather}
+        onLegModeChange={setLegMode}
+        defaultMode={mode}
+        onUpdate={updatePlace}
+        tripDays={tripDays}
+        dayNumber={dayNumber}
+        onMoveToDay={onMoveToDay}
       />
 
-      <div className="max-w-xl">{addSection}</div>
+      <div className="max-w-xl print:hidden">{addSection}</div>
 
       {isDesktop && (
-        <div className="space-y-2">
+        <div className="space-y-2 print:hidden">
           <div className="flex justify-end">
             <button
               type="button"

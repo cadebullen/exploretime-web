@@ -36,6 +36,7 @@ export default function DayDetailsPage() {
   const [saved, setSaved] = useState([]); // places added to this day
   const [start, setStart] = useState(null); // starting point for this day
   const [dayStartMin, setDayStartMin] = useState(9 * 60);
+  const [travel, setTravel] = useState({ travelMode: "BEST", legModes: {} });
   const [plannedCounts, setPlannedCounts] = useState({}); // day number -> stops
   const [dayWeather, setDayWeather] = useState(undefined); // undefined = loading, null = no forecast
   const [plannedElsewhere, setPlannedElsewhere] = useState({}); // place id -> [day numbers]
@@ -73,7 +74,9 @@ export default function DayDetailsPage() {
     const stored = getDayActivities(t, dayKey(selected.date));
     setSaved(stored.filter((item) => item && typeof item === "object"));
     setStart(getDayStart(t, dayKey(selected.date)));
-    setDayStartMin(getDayMeta(t, dayKey(selected.date)).startTime ?? 9 * 60);
+    const meta = getDayMeta(t, dayKey(selected.date));
+    setDayStartMin(meta.startTime ?? 9 * 60);
+    setTravel({ travelMode: meta.travelMode ?? "BEST", legModes: meta.legModes ?? {} });
 
     // Which places are already planned on the trip's other days.
     const elsewhere = {};
@@ -109,24 +112,17 @@ export default function DayDetailsPage() {
     }
   }, [saved.length, dayNumber]);
 
-  // Forecast for this day's date, when it's close enough to have one.
+  // Weather for this day: the forecast when it's close enough, otherwise
+  // typical weather for the date from past years.
   useEffect(() => {
     if (!trip || !selectedDay) return;
     let cancelled = false;
     setDayWeather(undefined);
-    const params = new URLSearchParams({
-      city: trip.destination.split(",")[0],
-      forecast: "true",
-      days: "10",
-    });
+    const params = new URLSearchParams({ date: dayKey(selectedDay.date) });
     if (trip.placeId) params.set("placeId", trip.placeId);
-    fetch(`/api/weather?${params}`)
+    fetch(`/api/day-weather?${params}`)
       .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return;
-        const key = dayKey(selectedDay.date);
-        setDayWeather(d.forecast?.find((f) => f.date === key) ?? null);
-      })
+      .then((d) => !cancelled && setDayWeather(d.error ? null : d))
       .catch(() => !cancelled && setDayWeather(null));
     return () => {
       cancelled = true;
@@ -289,6 +285,41 @@ export default function DayDetailsPage() {
     saveDayMeta(trip, key, { ...getDayMeta(trip, key), startTime: min });
   };
 
+  const changeTravel = (next) => {
+    if (!trip || !selectedDay) return;
+    setTravel(next);
+    const key = dayKey(selectedDay.date);
+    saveDayMeta(trip, key, { ...getDayMeta(trip, key), ...next });
+  };
+
+  // Moves (or copies) a planned place to another day of the trip.
+  const moveToDay = (place, targetDay, copy) => {
+    if (!trip || !selectedDay) return;
+    const target = days[targetDay - 1];
+    if (!target) return;
+    const targetKey = dayKey(target.date);
+    const targetPlan = getDayActivities(trip, targetKey).filter(
+      (item) => item && typeof item === "object",
+    );
+    const alreadyThere = targetPlan.some((p) => p.id === place.id);
+    if (!alreadyThere) {
+      saveDayActivities(trip, targetKey, [...targetPlan, { ...place, fixedTime: null }]);
+    }
+    setPlannedCounts((c) => ({
+      ...c,
+      [targetDay]: targetPlan.length + (alreadyThere ? 0 : 1),
+    }));
+    setPlannedElsewhere((e) => ({
+      ...e,
+      [place.id]: [...new Set([...(e[place.id] ?? []), targetDay])].sort((a, b) => a - b),
+    }));
+    if (!copy) {
+      const next = saved.filter((p) => p.id !== place.id);
+      setSaved(next);
+      saveDayActivities(trip, dayKey(selectedDay.date), next);
+    }
+  };
+
   const reorderPlan = (next) => {
     if (!trip || !selectedDay) return;
     setSaved(next);
@@ -305,7 +336,9 @@ export default function DayDetailsPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar />
+      <div className="print:hidden">
+        <Navbar />
+      </div>
 
       <main className="max-w-[1600px] mx-auto px-6 lg:px-10 2xl:px-16 py-10 space-y-8">
         <div className="space-y-5">
@@ -322,30 +355,44 @@ export default function DayDetailsPage() {
                   })}
                 </span>
               </h1>
-              <p className="text-sm text-white/55 mt-2 min-h-5">
-                {dayWeather === undefined ? null : dayWeather ? (
-                  <>
-                    <span className="mr-1.5">{dayWeather.icon}</span>
-                    {dayWeather.condition} · {dayWeather.maxTemp}° /{" "}
-                    {dayWeather.minTemp}°C · {dayWeather.rain}% chance of rain
-                  </>
+              <div className="mt-3 min-h-12">
+                {dayWeather === undefined ? (
+                  <p className="text-sm text-white/35">Loading weather…</p>
+                ) : dayWeather ? (
+                  <div className="inline-flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2">
+                    <span className="text-3xl leading-none">{dayWeather.icon}</span>
+                    <div>
+                      <p className="text-sm text-white">
+                        <span className="font-semibold">
+                          {dayWeather.max}° / {dayWeather.min}°C
+                        </span>{" "}
+                        · {dayWeather.condition}
+                        {dayWeather.kind === "forecast" &&
+                          dayWeather.rainChance !== null &&
+                          ` · ${dayWeather.rainChance}% chance of rain`}
+                      </p>
+                      <p className="text-xs text-white/45">
+                        {dayWeather.kind === "forecast"
+                          ? "Forecast"
+                          : `Typical for ${selectedDay.date.toLocaleDateString("en-US", { month: "long", day: "numeric" })}, from the last ${dayWeather.years} years. Rained on ${dayWeather.rainyYears} of them. The forecast appears about two weeks before.`}
+                      </p>
+                    </div>
+                  </div>
                 ) : (
-                  <span className="text-white/35">
-                    The forecast for this day appears closer to the date.
-                  </span>
+                  <p className="text-sm text-white/35">Weather unavailable for this day.</p>
                 )}
-              </p>
+              </div>
             </div>
             <button
               onClick={() => router.push("/home")}
-              className="px-4 py-2 rounded-lg border border-white/20 text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              className="px-4 py-2 rounded-lg border border-white/20 text-sm text-white/80 hover:text-white hover:bg-white/10 transition-colors print:hidden"
             >
               Back to itinerary
             </button>
           </div>
 
           {/* Day tabs */}
-          <nav aria-label="Days of this trip" className="flex gap-2 overflow-x-auto pb-1">
+          <nav aria-label="Days of this trip" className="flex gap-2 overflow-x-auto pb-1 print:hidden">
             {days.map((d, i) => {
               const n = i + 1;
               const active = n === dayNumber;
@@ -393,6 +440,19 @@ export default function DayDetailsPage() {
           tripPlaceId={trip.placeId ?? null}
           dayStartMin={dayStartMin}
           onDayStartChange={changeDayStart}
+          dayWeather={dayWeather || null}
+          plannerProps={{
+            travelMode: travel.travelMode,
+            legModes: travel.legModes,
+            onTravelChange: changeTravel,
+            tripDays: days.map((d, i) => ({
+              n: i + 1,
+              label: `Day ${i + 1} · ${d.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`,
+            })),
+            dayNumber,
+            onMoveToDay: moveToDay,
+            tripName: trip.destination.split(",")[0],
+          }}
           profile={profile}
           onSaveProfile={handleSaveProfile}
         />

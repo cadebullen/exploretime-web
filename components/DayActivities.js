@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { placeKind, priceLabel } from "@/lib/placeCategories";
 import {
   hoursLabel,
@@ -8,6 +8,7 @@ import {
   TIME_RANGE_LABELS,
 } from "@/lib/openingHours";
 import DayPlanner from "@/components/DayPlanner";
+import { shortestOrder } from "@/lib/planOrder";
 
 const TOTAL_STEPS = 4;
 const BLOCKS = ["Morning", "Afternoon", "Evening"];
@@ -247,6 +248,29 @@ function proximityBonus(place, anchors) {
   return 0;
 }
 
+// Searches whose places are mostly outdoors.
+const OUTDOOR_SEARCHES = new Set([
+  "hiking", "national_parks", "wildlife", "caves", "extreme", "camping",
+  "stargazing", "roadtrips", "beaches", "surfing", "diving", "cruises",
+  "gardens", "morning_sights",
+]);
+
+function isOutdoor(place) {
+  return place.category === "Outdoors" || OUTDOOR_SEARCHES.has(place.interest);
+}
+
+// Whether rain is likely for a time of day: from the forecast when there is
+// one, otherwise from past years for that date.
+function rainLikely(dayWeather, block) {
+  if (!dayWeather) return false;
+  const b = dayWeather.blocks?.[block];
+  if (b) return b.rainChance >= 60 || (b.wet && b.rainChance >= 40);
+  if (dayWeather.kind === "typical") {
+    return dayWeather.rainyYears * 2 > dayWeather.years;
+  }
+  return (dayWeather.rainChance ?? 0) >= 60;
+}
+
 function scorePlace(place, profile) {
   let score = 0;
 
@@ -421,6 +445,8 @@ export default function DayActivities({
   tripPlaceId = null,
   dayStartMin = 9 * 60,
   onDayStartChange,
+  dayWeather = null,
+  plannerProps = {}, // passed straight through to the day planner
   profile,
   onSaveProfile,
 }) {
@@ -452,6 +478,8 @@ export default function DayActivities({
     [start, saved],
   );
 
+  const rainy = rainLikely(dayWeather, timeOfDay);
+
   // Suggestions for the chosen time of day, as two lists. A place is shown
   // for every time of day it is open on this day's date; places without
   // opening hours use the time of day their search was meant for. Places
@@ -467,7 +495,8 @@ export default function DayActivities({
         score:
           scorePlace(place, selectedProfile) +
           (place.timeBlock === timeOfDay ? 1 : 0) +
-          proximityBonus(place, anchors),
+          proximityBonus(place, anchors) +
+          (rainy ? (isOutdoor(place) ? -3 : 1) : 0),
       }))
       .sort((a, b) => b.score - a.score)
       .map((item) => item.place);
@@ -479,10 +508,76 @@ export default function DayActivities({
       };
     };
     return { activity: forKind("activity"), food: forKind("food") };
-  }, [places, selectedProfile, timeOfDay, dayIndex, refreshes, date, anchors]);
+  }, [places, selectedProfile, timeOfDay, dayIndex, refreshes, date, anchors, rainy]);
 
   const refreshList = (kind) =>
     setRefreshes((r) => ({ ...r, [kind]: r[kind] + 1 }));
+
+  // "Plan my day for me": fills each time of day up to a simple template
+  // with the best-ranked places that are open then, close to each other,
+  // and not planned on other days; then puts the day in the shortest order.
+  const [beforeAutoPlan, setBeforeAutoPlan] = useState(null);
+  const DAY_TEMPLATE = {
+    Morning: { food: 1, activity: 1 },
+    Afternoon: { activity: 2, food: 1 },
+    Evening: { food: 1, activity: 1 },
+  };
+  const planMyDay = () => {
+    const picked = [];
+    const used = new Set([
+      ...saved.map((p) => p.id),
+      ...Object.keys(plannedElsewhere),
+    ]);
+    const near = [...anchors];
+    for (const block of BLOCKS) {
+      const blockRainy = rainLikely(dayWeather, block);
+      for (const [kind, wanted] of Object.entries(DAY_TEMPLATE[block])) {
+        const have = saved.filter(
+          (p) => p.timeBlock === block && placeKind(p) === kind,
+        ).length;
+        for (let k = have; k < wanted; k++) {
+          const best = places
+            .filter((p) => !used.has(p.id) && placeKind(p) === kind)
+            .filter((p) => {
+              const open = date ? openTimesOfDay(p.hours, date) : null;
+              return (open ?? [p.timeBlock]).includes(block);
+            })
+            .map((p) => ({
+              p,
+              score:
+                scorePlace(p, selectedProfile) +
+                (p.timeBlock === block ? 1.5 : 0) +
+                proximityBonus(p, near) +
+                (blockRainy ? (isOutdoor(p) ? -3 : 1) : 0),
+            }))
+            .sort((a, b) => b.score - a.score)[0];
+          if (!best) break;
+          used.add(best.p.id);
+          if (best.p.location) near.push(best.p.location);
+          picked.push({ ...best.p, timeBlock: block });
+        }
+      }
+    }
+    if (picked.length === 0) return;
+    setBeforeAutoPlan(saved);
+    onReorder(shortestOrder([...saved, ...picked], start));
+  };
+  // Any other change to the plan ends the chance to undo.
+  const autoPlanKey = useRef(null);
+  const savedKey = saved.map((p) => `${p.id}:${p.timeBlock}`).join(",");
+  useEffect(() => {
+    if (!beforeAutoPlan) {
+      autoPlanKey.current = null;
+    } else if (autoPlanKey.current === null) {
+      autoPlanKey.current = savedKey;
+    } else if (autoPlanKey.current !== savedKey) {
+      setBeforeAutoPlan(null);
+    }
+  }, [savedKey, beforeAutoPlan]);
+  const undoAutoPlan = () => {
+    if (beforeAutoPlan) onReorder(beforeAutoPlan);
+    setBeforeAutoPlan(null);
+  };
 
   const savedIds = new Set(saved.map((p) => p.id));
 
@@ -527,7 +622,7 @@ export default function DayActivities({
   return (
     <div className="space-y-8">
       {!editingPreferences && profile && (
-        <div className="flex justify-end">
+        <div className="flex justify-end print:hidden">
           <button
             type="button"
             onClick={openPreferencesEditor}
@@ -734,9 +829,34 @@ export default function DayActivities({
       {!editingPreferences && profile && (
         <>
           <section>
-            <h2 className="text-lg font-semibold text-white mb-3">
-              Your plan for this day
-            </h2>
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <h2 className="text-lg font-semibold text-white">
+                Your plan for this day
+              </h2>
+              {beforeAutoPlan ? (
+                <span className="text-sm text-white/70">
+                  Filled in your day.{" "}
+                  <button
+                    type="button"
+                    onClick={undoAutoPlan}
+                    className="text-white underline underline-offset-2 hover:no-underline"
+                  >
+                    Undo
+                  </button>
+                </span>
+              ) : (
+                places.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={planMyDay}
+                    className="rounded-lg bg-[#FF9F43] px-3 py-1.5 text-sm font-semibold text-[#1A1006] hover:brightness-110 print:hidden"
+                    title="Adds breakfast, lunch, dinner and a few activities that fit your preferences, then orders them for the shortest route"
+                  >
+                    {saved.length ? "Fill in the rest of my day" : "Plan my day for me"}
+                  </button>
+                )
+              )}
+            </div>
             <DayPlanner
               plan={saved}
               onChange={onReorder}
@@ -747,10 +867,12 @@ export default function DayActivities({
               date={date}
               dayStartMin={dayStartMin}
               onDayStartChange={onDayStartChange}
+              blockWeather={dayWeather?.blocks ?? null}
+              {...plannerProps}
             />
           </section>
 
-          <section className="space-y-8">
+          <section className="space-y-8 print:hidden">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-white">
                 Suggestions{city ? ` in ${city}` : ""}
@@ -770,6 +892,14 @@ export default function DayActivities({
                 </select>
               </label>
             </div>
+
+            {rainy && !placesLoading && (
+              <p className="text-sm text-white/70">
+                🌧️ Rain is likely in the {timeOfDay.toLowerCase()}
+                {dayWeather?.kind === "typical" ? " on this date in past years" : ""}
+                , so indoor places come first.
+              </p>
+            )}
 
             {placesLoading && (
               <div className="flex items-center gap-2 text-sm text-white/45">

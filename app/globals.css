@@ -106,3 +106,25 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Printing (e.g. the day plan's Print button): dark text on white paper. */
+@media print {
+  html,
+  body {
+    background: #fff !important;
+  }
+  * {
+    color: #111 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-color: #ccc !important;
+  }
+  select {
+    appearance: none;
+    border: none !important;
+    padding: 0 !important;
+  }
+  li {
+    break-inside: avoid;
+  }
+}

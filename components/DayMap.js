@@ -62,10 +62,15 @@ function formatDistance(m) {
   return m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`;
 }
 
-export function legLabel(leg, mode) {
+const MODE_WORDS = { WALK: "walk", TRANSIT: "by transit", DRIVE: "drive" };
+
+export function legLabel(leg) {
   if (!leg) return null;
-  const verb = mode === "DRIVE" ? "drive" : "walk";
-  return `${formatDuration(leg.durationSec)} ${verb} · ${formatDistance(leg.distanceMeters)}`;
+  if (leg.unavailable) {
+    return `No ${leg.mode === "TRANSIT" ? "transit" : "driving"} route · ${formatDuration(leg.durationSec)} walk`;
+  }
+  const lines = leg.transitLines?.length ? ` (${leg.transitLines.join(", ")})` : "";
+  return `${formatDuration(leg.durationSec)} ${MODE_WORDS[leg.mode] ?? ""}${lines} · ${formatDistance(leg.distanceMeters)}`;
 }
 
 // Map of the day's plan: numbered pins in plan order and the route between
@@ -73,8 +78,7 @@ export function legLabel(leg, mode) {
 export default function DayMap({
   plan, // ordered places, each with location { lat, lng }
   start = null, // starting point { name, location } or null
-  mode,
-  route, // { legs, polyline } or null
+  route, // { legs: [{ mode, polyline, … }] } or null
   selectedId,
   onSelect,
   onChange,
@@ -83,7 +87,7 @@ export default function DayMap({
   const mapRef = useRef(null);
   const markersRef = useRef([]);
   const startMarkerRef = useRef(null);
-  const lineRef = useRef(null);
+  const linesRef = useRef([]);
   const infoRef = useRef(null);
   const fittedKeyRef = useRef("");
   const [error, setError] = useState(MAPS_KEY ? null : "missing-key");
@@ -236,31 +240,38 @@ export default function DayMap({
     return () => listener.remove();
   }, [ready, stops, start, selectedId, plan, onChange, onSelect]);
 
-  // Route line.
+  // Route lines, one per leg, styled by how you travel it.
   useEffect(() => {
     if (!ready) return;
     const maps = window.google.maps;
-    lineRef.current?.setMap(null);
-    lineRef.current = null;
-    if (!route?.polyline) return;
-    lineRef.current = new maps.Polyline({
-      map: mapRef.current,
-      path: maps.geometry.encoding.decodePath(route.polyline),
-      strokeColor: ACCENT,
-      strokeOpacity: 0.85,
-      strokeWeight: 4,
-      ...(mode === "WALK" && {
-        strokeOpacity: 0,
-        icons: [
-          {
-            icon: { path: "M 0,-1 0,1", strokeOpacity: 0.9, strokeColor: ACCENT, scale: 3 },
-            offset: "0",
-            repeat: "12px",
-          },
-        ],
-      }),
-    });
-  }, [ready, route, mode]);
+    linesRef.current.forEach((l) => l.setMap(null));
+    linesRef.current = (route?.legs ?? [])
+      .filter((leg) => leg.polyline)
+      .map((leg) => {
+        const path = maps.geometry.encoding.decodePath(leg.polyline);
+        if (leg.mode === "WALK" || leg.unavailable) {
+          return new maps.Polyline({
+            map: mapRef.current,
+            path,
+            strokeOpacity: 0,
+            icons: [
+              {
+                icon: { path: "M 0,-1 0,1", strokeOpacity: 0.9, strokeColor: ACCENT, scale: 3 },
+                offset: "0",
+                repeat: "12px",
+              },
+            ],
+          });
+        }
+        return new maps.Polyline({
+          map: mapRef.current,
+          path,
+          strokeColor: leg.mode === "TRANSIT" ? "#7DD3FC" : ACCENT,
+          strokeOpacity: 0.9,
+          strokeWeight: 4,
+        });
+      });
+  }, [ready, route]);
 
   if (error === "missing-key") {
     return (
