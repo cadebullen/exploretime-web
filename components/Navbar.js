@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clearTrips, isLoggedIn } from "@/lib/storage";
 
@@ -9,10 +10,6 @@ export default function Navbar() {
 
   const handleNewTrip = () => {
     router.push("/onboarding");
-  };
-
-  const handleLogoClick = () => {
-    router.push("/");
   };
 
   const handleLoginClick = () => {
@@ -32,21 +29,18 @@ export default function Navbar() {
     <nav className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-8 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <span className="text-xl">🌍</span>
-          <span
-            className="text-base font-bold tracking-tight text-white cursor-pointer"
-            onClick={handleLogoClick}
+          <Link href="/home" className="flex items-center gap-2.5">
+            <span className="text-xl">🌍</span>
+            <span className="text-base font-bold tracking-tight text-white">
+              ExploreTime
+            </span>
+          </Link>
+          <Link
+            href="/home"
+            className="text-sm font-medium text-white/80 hover:text-white transition-colors"
           >
-            ExploreTime
-          </span>
-          <div>
-            <button
-              onClick={handleLogoClick}
-              className="text-sm font-medium text-white/80 hover:text-white transition-colors"
-            >
-              Home
-            </button>
-          </div>
+            Home
+          </Link>
         </div>
         <div className="flex items-center gap-2">
           <button
