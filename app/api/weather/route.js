@@ -1,4 +1,6 @@
-﻿// weatherapi.com condition codes -> emoji
+import { coordsForPlace } from "@/lib/placesServer";
+
+// weatherapi.com condition codes -> emoji
 function conditionEmoji(code, isDay) {
   if (code === 1000) return isDay ? "☀️" : "🌙";
   if ([1003].includes(code)) return "⛅️";
@@ -10,26 +12,6 @@ function conditionEmoji(code, isDay) {
   if ([1063, 1150, 1153, 1180, 1183, 1240].includes(code)) return "🌦️";
   if ([1186, 1189, 1192, 1195, 1243, 1246].includes(code)) return "🌧️";
   return "🌡️";
-}
-
-// Looks up a Google place's coordinates so small towns resolve exactly.
-async function coordsForPlace(placeId) {
-  const key = process.env.PLACES_KEY;
-  if (!placeId || !key) return null;
-  try {
-    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=geometry&key=${key}`;
-    const res = await fetch(url, { next: { revalidate: 86400 } });
-    const data = await res.json();
-    const loc = data.result?.geometry?.location;
-    if (!loc) {
-      console.error("[Weather API] place lookup", data.status, data.error_message ?? "");
-      return null;
-    }
-    return `${loc.lat},${loc.lng}`;
-  } catch (err) {
-    console.error("[Weather API] place lookup", err);
-    return null;
-  }
 }
 
 export async function GET(request) {

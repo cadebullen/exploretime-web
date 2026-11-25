@@ -12,7 +12,6 @@ import {
   getTripActivityProfile,
   saveTripActivityProfile,
 } from "@/lib/storage";
-import { getSuggestedActivities } from "@/lib/activitySuggestions";
 
 function dayKey(date) {
   const year = date.getFullYear();
@@ -27,8 +26,11 @@ export default function DayDetailsPage() {
 
   const [trip, setTrip] = useState(null);
   const [days, setDays] = useState([]);
-  const [savedIds, setSavedIds] = useState([]);
+  const [saved, setSaved] = useState([]); // places added to this day
   const [profile, setProfile] = useState(null);
+  const [places, setPlaces] = useState([]);
+  const [placesLoading, setPlacesLoading] = useState(false);
+  const [placesError, setPlacesError] = useState(null);
 
   const dayNumber = Number(params.day);
 
@@ -53,8 +55,9 @@ export default function DayDetailsPage() {
     setDays(allDays);
 
     const selected = allDays[dayNumber - 1];
+    // Older versions saved ids of generic suggestions; keep only real places.
     const stored = getDayActivities(t, dayKey(selected.date));
-    setSavedIds(stored);
+    setSaved(stored.filter((item) => item && typeof item === "object"));
     setProfile(getTripActivityProfile(t));
   }, [dayNumber, router]);
 
@@ -63,19 +66,62 @@ export default function DayDetailsPage() {
     return days[dayNumber - 1] ?? null;
   }, [days, dayNumber]);
 
-  const suggestions = useMemo(() => {
-    if (!trip) return [];
-    return getSuggestedActivities(trip.destination);
-  }, [trip]);
+  // Real places for the trip's destination, based on the chosen interests.
+  const interestsKey = (profile?.interests ?? []).join(",");
+  useEffect(() => {
+    if (!trip || !profile) return;
+    let cancelled = false;
+    const params = new URLSearchParams({
+      city: trip.destination,
+      interests: interestsKey,
+    });
+    if (trip.placeId) params.set("placeId", trip.placeId);
 
-  const toggleSave = (activityId) => {
+    setPlacesLoading(true);
+    setPlacesError(null);
+    fetch(`/api/recommendations?${params}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        if (d.error) {
+          setPlaces([]);
+          setPlacesError(d.error);
+        } else {
+          setPlaces(d.places ?? []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPlacesError("Couldn't reach the server.");
+      })
+      .finally(() => {
+        if (!cancelled) setPlacesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [trip, profile, interestsKey]);
+
+  const toggleSave = (place) => {
     if (!trip || !selectedDay) return;
 
-    const next = savedIds.includes(activityId)
-      ? savedIds.filter((id) => id !== activityId)
-      : [...savedIds, activityId];
+    const next = saved.some((p) => p.id === place.id)
+      ? saved.filter((p) => p.id !== place.id)
+      : [
+          ...saved,
+          {
+            id: place.id,
+            name: place.name,
+            address: place.address,
+            category: place.category,
+            timeBlock: place.timeBlock,
+            rating: place.rating,
+            priceLevel: place.priceLevel,
+            photoRef: place.photoRef,
+            mapsUrl: place.mapsUrl,
+          },
+        ];
 
-    setSavedIds(next);
+    setSaved(next);
     saveDayActivities(trip, dayKey(selectedDay.date), next);
   };
 
@@ -128,8 +174,13 @@ export default function DayDetailsPage() {
         </div>
 
         <DayActivities
-          suggestions={suggestions}
-          savedIds={savedIds}
+          places={places}
+          placesLoading={placesLoading}
+          placesError={placesError}
+          city={trip.destination.split(",")[0]}
+          dayIndex={dayNumber - 1}
+          dayCount={days.length}
+          saved={saved}
           onToggleSave={toggleSave}
           profile={profile}
           onSaveProfile={handleSaveProfile}

@@ -1,6 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
+import { priceLabel } from "@/lib/placeCategories";
 
 const TOTAL_STEPS = 4;
 const BLOCKS = ["Morning", "Afternoon", "Evening"];
@@ -150,10 +151,10 @@ const VIBE_OPTIONS = [
 
 const VIBE_CATEGORY_BONUS = {
   "slow-mindful": ["Culture", "Leisure"],
-  "fast-electric": ["Culture", "Shopping"],
+  "fast-electric": ["Culture", "Shopping", "Nightlife"],
   "coastal-sunny": ["Outdoors", "Leisure"],
   "raw-nature": ["Outdoors"],
-  "high-octane": ["Food", "Shopping"],
+  "high-octane": ["Food", "Shopping", "Nightlife"],
   "romantic-cozy": ["Food", "Leisure"],
 };
 
@@ -163,14 +164,17 @@ const ACTIVITY_CATEGORY_GROUP = {
   outdoors: "nature",
   shopping: "social",
   leisure: "leisure",
+  nightlife: "social",
 };
 
-const BUDGET_SCORE_BY_COST = {
-  "ultra-low": { Free: 3, $: 3, "$-$$": 1, $$: 0, $$$: 0 },
-  low: { Free: 3, $: 2, "$-$$": 2, $$: 1, $$$: 0 },
-  hybrid: { Free: 1, $: 1, "$-$$": 2, $$: 2, $$$: 1 },
-  high: { Free: 0, $: 0, "$-$$": 1, $$: 2, $$$: 2 },
-  "ultra-high": { Free: 0, $: 0, "$-$$": 1, $$: 2, $$$: 3 },
+// Score by Google price level (0 = free … 4 = very expensive) for each budget
+// style. Places without a price level get a neutral score.
+const BUDGET_SCORE_BY_PRICE = {
+  "ultra-low": [3, 3, 1, 0, 0],
+  low: [3, 2, 2, 0, 0],
+  hybrid: [1, 1, 2, 2, 1],
+  high: [0, 0, 1, 2, 3],
+  "ultra-high": [0, 0, 0, 2, 3],
 };
 
 const SOCIAL_CATEGORY_BONUS = {
@@ -216,44 +220,122 @@ function normalizeProfile(profile) {
   return { vibe, budget, social, interests: [...new Set(normalizedInterests)] };
 }
 
-function scoreActivity(activity, profile) {
+function scorePlace(place, profile) {
   let score = 0;
 
-  const category = String(activity.category ?? "");
-  const categoryTitle =
-    category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
+  // Found by a search for one of the user's interests
+  if (profile.interests.includes(place.interest)) score += 3;
+
   const categoryGroup =
-    ACTIVITY_CATEGORY_GROUP[category.toLowerCase()] ?? "culture";
+    ACTIVITY_CATEGORY_GROUP[String(place.category).toLowerCase()] ?? "culture";
 
-  const selectedCats = new Set(
-    profile.interests
-      .map(
-        (interestId) =>
-          INTEREST_OPTIONS.find((opt) => opt.id === interestId)?.cat,
-      )
-      .filter(Boolean),
-  );
-
-  if (selectedCats.has(categoryGroup)) score += 3;
-
-  const vibeCategories = VIBE_CATEGORY_BONUS[profile.vibe] ?? [];
-  if (vibeCategories.includes(categoryTitle)) {
+  if ((VIBE_CATEGORY_BONUS[profile.vibe] ?? []).includes(place.category)) {
     score += 1;
   }
 
-  score += BUDGET_SCORE_BY_COST[profile.budget]?.[activity.costEstimate] ?? 0;
+  score +=
+    place.priceLevel === null || place.priceLevel === undefined
+      ? 1
+      : (BUDGET_SCORE_BY_PRICE[profile.budget]?.[place.priceLevel] ?? 0);
 
-  const socialCats = SOCIAL_CATEGORY_BONUS[profile.social] ?? [];
-  if (socialCats.includes(categoryGroup)) {
+  if ((SOCIAL_CATEGORY_BONUS[profile.social] ?? []).includes(categoryGroup)) {
     score += 1;
   }
+
+  // Well-reviewed places first; very few reviews counts against a place.
+  if (place.rating >= 4.6) score += 1.5;
+  else if (place.rating >= 4.3) score += 1;
+  else if (place.rating && place.rating < 3.8) score -= 1;
+  if (place.ratingCount < 30) score -= 1;
 
   return score;
 }
 
+const PER_BLOCK = 6;
+
+// Splits each time block's ranked places across the trip's days, so each day
+// gets its own suggestions. With too few places to split, every day sees all.
+function placesForDay(ranked, dayIndex, dayCount) {
+  if (dayCount <= 1 || ranked.length < dayCount * 3) {
+    return ranked.slice(0, PER_BLOCK);
+  }
+  return ranked
+    .filter((_, i) => i % dayCount === dayIndex % dayCount)
+    .slice(0, PER_BLOCK);
+}
+
+function PlaceCard({ place, isSaved, onToggle }) {
+  const price = priceLabel(place.priceLevel);
+  return (
+    <li className="rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden flex flex-col">
+      <div className="aspect-[16/9] bg-white/5">
+        {place.photoRef && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`/api/place-photo?ref=${encodeURIComponent(place.photoRef)}&w=480`}
+            alt=""
+            loading="lazy"
+            className="w-full h-full object-cover"
+          />
+        )}
+      </div>
+      <div className="p-4 flex-1 flex flex-col">
+        <p className="text-xs text-white/45">
+          {place.category}
+          {price && <span className="ml-2 text-white/60">{price}</span>}
+        </p>
+        <h4 className="text-base font-semibold text-white mt-1 leading-snug">
+          {place.name}
+        </h4>
+        {place.rating && (
+          <p className="text-xs text-white/60 mt-1">
+            ★ {place.rating.toFixed(1)}
+            {place.ratingCount > 0 && (
+              <span className="text-white/35">
+                {" "}
+                ({place.ratingCount.toLocaleString()})
+              </span>
+            )}
+          </p>
+        )}
+        <p className="text-xs text-white/35 mt-1 line-clamp-2">
+          {place.address}
+        </p>
+        <div className="mt-auto pt-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onToggle(place)}
+            aria-pressed={isSaved}
+            className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              isSaved
+                ? "bg-white/10 text-white hover:bg-white/15"
+                : "bg-[#FF9F43] text-[#1A1006] hover:brightness-110"
+            }`}
+          >
+            {isSaved ? "Added ✓" : "Add to day"}
+          </button>
+          <a
+            href={place.mapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-2 rounded-lg text-sm text-white/70 border border-white/15 hover:text-white hover:border-white/30 transition-colors"
+          >
+            Map
+          </a>
+        </div>
+      </div>
+    </li>
+  );
+}
+
 export default function DayActivities({
-  suggestions,
-  savedIds,
+  places = [],
+  placesLoading = false,
+  placesError = null,
+  city = "",
+  dayIndex = 0,
+  dayCount = 1,
+  saved = [],
   onToggleSave,
   profile,
   onSaveProfile,
@@ -275,24 +357,23 @@ export default function DayActivities({
     ? draft
     : normalizeProfile(profile ?? draft);
 
-  const rankedSuggestions = useMemo(() => {
-    return [...suggestions]
-      .map((activity) => ({
-        activity,
-        score: scoreActivity(activity, selectedProfile),
-      }))
-      .sort((a, b) => b.score - a.score)
-      .map((item) => item.activity);
-  }, [suggestions, selectedProfile]);
-
   const grouped = useMemo(() => {
     const out = { Morning: [], Afternoon: [], Evening: [] };
-    for (const activity of rankedSuggestions) {
-      if (!out[activity.timeBlock]) out[activity.timeBlock] = [];
-      out[activity.timeBlock].push(activity);
+    const ranked = [...places]
+      .map((place) => ({ place, score: scorePlace(place, selectedProfile) }))
+      .sort((a, b) => b.score - a.score)
+      .map((item) => item.place);
+    for (const block of BLOCKS) {
+      out[block] = placesForDay(
+        ranked.filter((p) => p.timeBlock === block),
+        dayIndex,
+        dayCount,
+      );
     }
     return out;
-  }, [rankedSuggestions]);
+  }, [places, selectedProfile, dayIndex, dayCount]);
+
+  const savedIds = new Set(saved.map((p) => p.id));
 
   const toggleInterest = (interest) => {
     setDraft((prev) => {
@@ -537,6 +618,114 @@ export default function DayActivities({
             )}
           </div>
         </section>
+      )}
+
+      {!editingPreferences && profile && (
+        <>
+          <section>
+            <h2 className="text-lg font-semibold text-white mb-3">
+              Your plan for this day
+            </h2>
+            {saved.length === 0 ? (
+              <p className="text-sm text-white/45">
+                Nothing planned yet. Add places from the suggestions below.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {BLOCKS.flatMap((block) =>
+                  saved
+                    .filter((p) => p.timeBlock === block)
+                    .map((p) => (
+                      <li
+                        key={p.id}
+                        className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3"
+                      >
+                        <span className="w-20 shrink-0 text-xs text-white/45">
+                          {block}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm font-medium text-white truncate">
+                            {p.name}
+                          </span>
+                          <span className="block text-xs text-white/40 truncate">
+                            {p.category}
+                            {p.address ? ` · ${p.address}` : ""}
+                          </span>
+                        </span>
+                        <a
+                          href={p.mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-white/60 hover:text-white"
+                        >
+                          Map
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => onToggleSave(p)}
+                          className="text-xs text-white/50 hover:text-white"
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    )),
+                )}
+              </ul>
+            )}
+          </section>
+
+          <section className="space-y-8">
+            <h2 className="text-lg font-semibold text-white">
+              Suggestions{city ? ` in ${city}` : ""}
+            </h2>
+
+            {placesLoading && (
+              <div className="flex items-center gap-2 text-sm text-white/45">
+                <div className="w-3 h-3 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                Finding places that match your preferences…
+              </div>
+            )}
+
+            {!placesLoading && placesError && (
+              <p className="text-sm text-white/60">
+                Couldn&apos;t load suggestions ({placesError}). Check that
+                PLACES_KEY is set and the Places API is enabled, then reload
+                the page.
+              </p>
+            )}
+
+            {!placesLoading &&
+              !placesError &&
+              BLOCKS.every((b) => grouped[b].length === 0) && (
+                <p className="text-sm text-white/60">
+                  No places found for these interests. Try adding more
+                  interests with Change preferences.
+                </p>
+              )}
+
+            {!placesLoading &&
+              BLOCKS.map(
+                (block) =>
+                  grouped[block].length > 0 && (
+                    <div key={block}>
+                      <h3 className="text-sm font-semibold text-white/70 mb-3">
+                        {block}
+                      </h3>
+                      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {grouped[block].map((place) => (
+                          <PlaceCard
+                            key={place.id}
+                            place={place}
+                            isSaved={savedIds.has(place.id)}
+                            onToggle={onToggleSave}
+                          />
+                        ))}
+                      </ul>
+                    </div>
+                  ),
+              )}
+          </section>
+        </>
       )}
     </div>
   );
