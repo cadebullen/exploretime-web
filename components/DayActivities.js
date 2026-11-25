@@ -226,6 +226,27 @@ function normalizeProfile(profile) {
   return { vibe, budget, social, interests: [...new Set(normalizedInterests)] };
 }
 
+// Straight-line distance in km.
+function km(a, b) {
+  const rad = (d) => (d * Math.PI) / 180;
+  const h =
+    Math.sin(rad(b.lat - a.lat) / 2) ** 2 +
+    Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lng - a.lng) / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+}
+
+// Bonus for places near the day's planned stops or starting point, so the
+// day stays compact. 0 when nothing is planned yet.
+function proximityBonus(place, anchors) {
+  if (!place.location || anchors.length === 0) return 0;
+  const nearest = Math.min(...anchors.map((a) => km(a, place.location)));
+  if (nearest < 1) return 2.5;
+  if (nearest < 3) return 1.5;
+  if (nearest < 6) return 0.5;
+  if (nearest > 15) return -1.5;
+  return 0;
+}
+
 function scorePlace(place, profile) {
   let score = 0;
 
@@ -368,6 +389,16 @@ function PlaceCard({ place, date, isSaved, otherDays = [], onToggle }) {
           >
             Map
           </a>
+          {place.website && (
+            <a
+              href={place.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-2 rounded-lg text-sm text-white/70 border border-white/15 hover:text-white hover:border-white/30 transition-colors"
+            >
+              Website
+            </a>
+          )}
         </div>
       </div>
     </li>
@@ -388,6 +419,8 @@ export default function DayActivities({
   start = null,
   onStartChange,
   tripPlaceId = null,
+  dayStartMin = 9 * 60,
+  onDayStartChange,
   profile,
   onSaveProfile,
 }) {
@@ -412,6 +445,13 @@ export default function DayActivities({
   // How many times each list was refreshed.
   const [refreshes, setRefreshes] = useState({ activity: 0, food: 0 });
 
+  // Planned stops and the starting point, for ranking nearby places higher.
+  const anchors = useMemo(
+    () =>
+      [start?.location, ...saved.map((p) => p.location)].filter(Boolean),
+    [start, saved],
+  );
+
   // Suggestions for the chosen time of day, as two lists. A place is shown
   // for every time of day it is open on this day's date; places without
   // opening hours use the time of day their search was meant for. Places
@@ -426,7 +466,8 @@ export default function DayActivities({
         place,
         score:
           scorePlace(place, selectedProfile) +
-          (place.timeBlock === timeOfDay ? 1 : 0),
+          (place.timeBlock === timeOfDay ? 1 : 0) +
+          proximityBonus(place, anchors),
       }))
       .sort((a, b) => b.score - a.score)
       .map((item) => item.place);
@@ -438,7 +479,7 @@ export default function DayActivities({
       };
     };
     return { activity: forKind("activity"), food: forKind("food") };
-  }, [places, selectedProfile, timeOfDay, dayIndex, refreshes, date]);
+  }, [places, selectedProfile, timeOfDay, dayIndex, refreshes, date, anchors]);
 
   const refreshList = (kind) =>
     setRefreshes((r) => ({ ...r, [kind]: r[kind] + 1 }));
@@ -703,6 +744,9 @@ export default function DayActivities({
               start={start}
               onStartChange={onStartChange}
               tripPlaceId={tripPlaceId}
+              date={date}
+              dayStartMin={dayStartMin}
+              onDayStartChange={onDayStartChange}
             />
           </section>
 

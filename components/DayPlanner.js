@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DayPlan from "@/components/DayPlan";
 import DayMap, { legLabel } from "@/components/DayMap";
 import StartPointPicker from "@/components/StartPointPicker";
+import AddPlacePicker from "@/components/AddPlacePicker";
+import { availabilityAt, formatClock, TIME_RANGE_LABELS } from "@/lib/openingHours";
+import { buildTimeline } from "@/lib/timeline";
 import { orderPlan, shortestOrder, isShortestOrder } from "@/lib/planOrder";
 
 // True on screens at least `lg` (1024px) wide.
@@ -29,6 +32,9 @@ export default function DayPlanner({
   start = null, // { id, name, address, location } or null
   onStartChange = () => {}, // (start | null, applyToOtherDays) => void
   tripPlaceId = null,
+  date = null, // the day's date
+  dayStartMin = 9 * 60, // when the day starts, minutes after midnight
+  onDayStartChange = () => {},
 }) {
   const ordered = useMemo(() => orderPlan(plan), [plan]);
   const [selectedId, setSelectedId] = useState(null);
@@ -115,6 +121,53 @@ export default function DayPlanner({
     return out;
   }, [route, stops, mode]);
   const anyFar = Object.values(legsByFromId).some((l) => l.far);
+
+  // Rough timeline: arrival and leaving time at each stop.
+  const travelToId = useMemo(() => {
+    const out = {};
+    route?.legs?.forEach((leg, i) => {
+      if (stops[i + 1]) out[stops[i + 1].id] = leg.durationSec;
+    });
+    return out;
+  }, [route, stops]);
+  const times = useMemo(
+    () => buildTimeline(ordered, (id) => travelToId[id] ?? 0, dayStartMin),
+    [ordered, travelToId, dayStartMin],
+  );
+
+  // Warnings: closed that day / at the arrival time, or running late.
+  const issues = useMemo(() => {
+    const out = {};
+    const weekday = date?.toLocaleDateString("en-US", { weekday: "long" });
+    for (const p of ordered) {
+      const t = times[p.id];
+      if (!t) continue;
+      const a = date ? availabilityAt(p.hours, date, t.arrive) : null;
+      if (a && !a.ok) {
+        out[p.id] =
+          a.reason === "closed-day"
+            ? `Closed on ${weekday}s`
+            : a.reason === "not-open-yet"
+              ? `Opens at ${formatClock(a.opensAt)}, you'd arrive around ${formatClock(t.arrive)}`
+              : `Closes at ${formatClock(a.closesAt)}, you'd arrive around ${formatClock(t.arrive)}`;
+      } else if (t.overruns) {
+        out[p.id] = `Runs past the ${p.timeBlock.toLowerCase()} (${TIME_RANGE_LABELS[p.timeBlock]})`;
+      }
+    }
+    return out;
+  }, [ordered, times, date]);
+  const issueCount = Object.keys(issues).length;
+
+  const [addingPlace, setAddingPlace] = useState(false);
+  const addPlace = (place) => {
+    setAddingPlace(false);
+    if (ordered.some((p) => p.id === place.id)) return;
+    onChangeRef.current([...ordered, place]);
+  };
+  const changeDuration = (id, durationMin) =>
+    onChangeRef.current(
+      ordered.map((p) => (p.id === id ? { ...p, durationMin } : p)),
+    );
 
   // Shortest order, with one step of undo.
   const [beforeShortest, setBeforeShortest] = useState(null);
@@ -220,13 +273,33 @@ export default function DayPlanner({
     </button>
   );
 
+  const addSection = (
+    addingPlace ? (
+          <AddPlacePicker
+            tripPlaceId={tripPlaceId}
+            onAdd={addPlace}
+            onCancel={() => setAddingPlace(false)}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAddingPlace(true)}
+            className="w-full rounded-xl border border-dashed border-white/20 px-3 py-3 text-left text-sm text-white/60 hover:text-white hover:border-white/40 transition-colors"
+          >
+            + Add a specific place
+          </button>
+        )
+  );
+
   if (ordered.length === 0 && !start) {
     return (
       <div className="space-y-3">
         {startSection}
         <p className="text-sm text-white/45">
-          Nothing planned yet. Add places from the suggestions below.
+          Nothing planned yet. Add places from the suggestions below, or add a
+          specific place.
         </p>
+        {addSection}
       </div>
     );
   }
@@ -304,6 +377,27 @@ export default function DayPlanner({
             is enabled for PLACES_KEY.
           </p>
         )}
+        <label className="flex items-center gap-2 text-sm text-white/60">
+          Day starts at
+          <select
+            value={dayStartMin}
+            onChange={(e) => onDayStartChange(Number(e.target.value))}
+            className="rounded-lg border border-white/15 bg-zinc-900 px-2 py-1.5 text-sm text-white outline-none focus:border-[#FF9F43]"
+          >
+            {Array.from({ length: 15 }, (_, i) => 5 * 60 + i * 30).map((m) => (
+              <option key={m} value={m}>
+                {formatClock(m)}
+              </option>
+            ))}
+          </select>
+        </label>
+        {issueCount > 0 && (
+          <p className="text-xs text-[#FFC48A]">
+            {issueCount} stop{issueCount === 1 ? " needs" : "s need"} a look:
+            closed, or the timing doesn&apos;t fit. Details are under each
+            stop.
+          </p>
+        )}
         {startSection}
         {ordered.length === 0 && (
           <p className="text-sm text-white/45">
@@ -317,7 +411,11 @@ export default function DayPlanner({
           selectedId={selectedId}
           onSelect={handleSelect}
           legsByFromId={legsByFromId}
+          times={times}
+          issues={issues}
+          onDurationChange={changeDuration}
         />
+        {addSection}
       </div>
       {isDesktop ? (
         <div className="h-[34rem] 2xl:h-[40rem]">{map}</div>

@@ -8,7 +8,8 @@ import {
   dropPlace,
   canMove,
 } from "@/lib/planOrder";
-import { TIME_RANGE_LABELS } from "@/lib/openingHours";
+import { TIME_RANGE_LABELS, formatClock } from "@/lib/openingHours";
+import { DURATION_OPTIONS, formatDuration, visitMinutes } from "@/lib/timeline";
 
 // The places planned for one day, grouped by time of day. Reorder by dragging
 // (also between times of day) or with the up/down buttons.
@@ -19,6 +20,9 @@ export default function DayPlan({
   selectedId = null,
   onSelect = () => {},
   legsByFromId = {},
+  times = {}, // id -> { arrive, leave, overruns }
+  issues = {}, // id -> warning text
+  onDurationChange = () => {},
 }) {
   const [draggingId, setDraggingId] = useState(null);
   const [dropTarget, setDropTarget] = useState(null); // "block:Morning" or a place id
@@ -125,25 +129,70 @@ export default function DayPlan({
                   >
                     {numberOf(p.id)}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => onSelect(selectedId === p.id ? null : p.id)}
-                    className="flex-1 min-w-0 text-left"
-                    title="Show on map"
-                  >
-                    <span className="block text-sm font-medium text-white truncate">
+                  <div className="flex-1 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => onSelect(selectedId === p.id ? null : p.id)}
+                      className="block max-w-full text-left text-sm font-medium text-white truncate hover:underline underline-offset-2"
+                      title="Show on map"
+                    >
                       {p.name}
-                    </span>
-                    <span
-                      className={`block text-xs truncate ${
+                    </button>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/55 mt-0.5">
+                      {times[p.id] && (
+                        <span className={times[p.id].overruns ? "text-[#FFC48A]" : ""}>
+                          ~{formatClock(times[p.id].arrive)} – {formatClock(times[p.id].leave)}
+                        </span>
+                      )}
+                      <select
+                        value={visitMinutes(p)}
+                        onChange={(e) => onDurationChange(p.id, Number(e.target.value))}
+                        aria-label={`Time to spend at ${p.name}`}
+                        className="rounded border border-white/10 bg-zinc-900 px-1 py-0.5 text-xs text-white/70 outline-none focus:border-[#FF9F43]"
+                      >
+                        {[...new Set([...DURATION_OPTIONS, visitMinutes(p)])]
+                          .sort((a, b) => a - b)
+                          .map((m) => (
+                            <option key={m} value={m}>
+                              {formatDuration(m)}
+                            </option>
+                          ))}
+                      </select>
+                      {p.category === "Food" && p.reservable && (
+                        <span className="text-white/60">Takes reservations</span>
+                      )}
+                      {p.website && (
+                        <a
+                          href={p.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-white/60 underline underline-offset-2 hover:text-white"
+                        >
+                          {p.category === "Food" && p.reservable ? "Book / website" : "Website"}
+                        </a>
+                      )}
+                      {p.category === "Food" && p.phoneIntl && (
+                        <a
+                          href={`tel:${p.phoneIntl.replace(/\s+/g, "")}`}
+                          className="text-white/60 underline underline-offset-2 hover:text-white"
+                        >
+                          Call
+                        </a>
+                      )}
+                    </div>
+                    {issues[p.id] && (
+                      <p className="text-xs text-[#FFC48A] mt-0.5">{issues[p.id]}</p>
+                    )}
+                    <p
+                      className={`text-xs truncate mt-0.5 ${
                         legsByFromId[p.id]?.far ? "text-[#FFC48A]" : "text-white/40"
                       }`}
                     >
                       {legsByFromId[p.id]
                         ? `Next stop: ${legsByFromId[p.id].label}${legsByFromId[p.id].far ? " (far)" : ""}`
                         : `${p.category}${p.address ? ` · ${p.address}` : ""}`}
-                    </span>
-                  </button>
+                    </p>
+                  </div>
                   <span className="flex items-center gap-1">
                     <button
                       type="button"
