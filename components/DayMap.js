@@ -141,7 +141,7 @@ export default function DayMap({
         zIndex: place.id === selectedId ? 1000 : i,
         gmpClickable: true,
       });
-      marker.addListener("click", () => onSelect(place.id));
+      marker.addEventListener("gmp-click", () => onSelect(place.id));
       return marker;
     });
 
@@ -159,7 +159,7 @@ export default function DayMap({
         zIndex: 999,
         gmpClickable: true,
       });
-      startMarkerRef.current.addListener("click", () => onSelect("start"));
+      startMarkerRef.current.addEventListener("gmp-click", () => onSelect("start"));
     }
 
     // Fit the view when the set of places changes (not on every reorder).
