@@ -60,6 +60,7 @@ export function legLabel(leg, mode) {
 // them. Pins can move a place earlier or later, which reorders the plan.
 export default function DayMap({
   plan, // ordered places, each with location { lat, lng }
+  start = null, // starting point { name, location } or null
   mode,
   route, // { legs, polyline } or null
   selectedId,
@@ -69,6 +70,7 @@ export default function DayMap({
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
+  const startMarkerRef = useRef(null);
   const lineRef = useRef(null);
   const infoRef = useRef(null);
   const fittedKeyRef = useRef("");
@@ -133,25 +135,66 @@ export default function DayMap({
       return marker;
     });
 
+    // Starting point: a white "S" pin.
+    startMarkerRef.current?.setMap(null);
+    startMarkerRef.current = null;
+    if (start?.location) {
+      startMarkerRef.current = new maps.Marker({
+        map,
+        position: start.location,
+        title: `Start: ${start.name}`,
+        label: { text: "S", color: "#1A1006", fontWeight: "700", fontSize: "12px" },
+        icon: {
+          path: maps.SymbolPath.CIRCLE,
+          scale: 13,
+          fillColor: selectedId === "start" ? ACCENT : "#FFFFFF",
+          fillOpacity: 1,
+          strokeColor: "#1A1006",
+          strokeWeight: 2,
+        },
+        zIndex: 999,
+      });
+      startMarkerRef.current.addListener("click", () => onSelect("start"));
+    }
+
     // Fit the view when the set of places changes (not on every reorder).
-    const key = stops.map((p) => p.id).sort().join(",");
-    if (key !== fittedKeyRef.current && stops.length) {
+    const points = [
+      ...(start?.location ? [start.location] : []),
+      ...stops.map((p) => p.location),
+    ];
+    const key = [start?.id ?? "", ...stops.map((p) => p.id).sort()].join(",");
+    if (key !== fittedKeyRef.current && points.length) {
       fittedKeyRef.current = key;
-      if (stops.length === 1) {
-        map.setCenter(stops[0].location);
+      if (points.length === 1) {
+        map.setCenter(points[0]);
         map.setZoom(15);
       } else {
         const bounds = new maps.LatLngBounds();
-        stops.forEach((p) => bounds.extend(p.location));
+        points.forEach((pt) => bounds.extend(pt));
         map.fitBounds(bounds, 48);
       }
     }
-  }, [ready, stops, selectedId, onSelect]);
+  }, [ready, stops, start, selectedId, onSelect]);
 
   // Info window for the selected place, with earlier/later buttons.
   useEffect(() => {
     if (!ready) return;
     const info = infoRef.current;
+    if (selectedId === "start" && start?.location) {
+      const box = document.createElement("div");
+      box.style.cssText = "font: 13px system-ui, sans-serif; color: #111; min-width: 160px;";
+      const title = document.createElement("div");
+      title.style.cssText = "font-weight: 600;";
+      title.textContent = `Start: ${start.name}`;
+      const sub = document.createElement("div");
+      sub.style.cssText = "color: #666; font-size: 12px;";
+      sub.textContent = start.address ?? "";
+      box.append(title, sub);
+      info.setContent(box);
+      info.open({ map: mapRef.current, anchor: startMarkerRef.current });
+      const l = info.addListener("closeclick", () => onSelect(null));
+      return () => l.remove();
+    }
     const index = stops.findIndex((p) => p.id === selectedId);
     if (index === -1) {
       info.close();
@@ -186,7 +229,7 @@ export default function DayMap({
     info.open({ map: mapRef.current, anchor: markersRef.current[index] });
     const listener = info.addListener("closeclick", () => onSelect(null));
     return () => listener.remove();
-  }, [ready, stops, selectedId, plan, onChange, onSelect]);
+  }, [ready, stops, start, selectedId, plan, onChange, onSelect]);
 
   // Route line.
   useEffect(() => {

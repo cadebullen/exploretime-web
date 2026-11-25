@@ -26,13 +26,7 @@ export default function DayPlan({
   const ordered = orderPlan(plan);
   const numberOf = (id) => ordered.findIndex((p) => p.id === id) + 1;
 
-  if (ordered.length === 0) {
-    return (
-      <p className="text-sm text-white/45">
-        Nothing planned yet. Add places from the suggestions below.
-      </p>
-    );
-  }
+  if (ordered.length === 0) return null;
 
   const endDrag = () => {
     setDraggingId(null);

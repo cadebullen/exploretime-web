@@ -13,6 +13,8 @@ import {
   saveDayActivities,
   getTripActivityProfile,
   saveTripActivityProfile,
+  getDayStart,
+  saveDayStart,
 } from "@/lib/storage";
 
 function dayKey(date) {
@@ -29,6 +31,7 @@ export default function DayDetailsPage() {
   const [trip, setTrip] = useState(null);
   const [days, setDays] = useState([]);
   const [saved, setSaved] = useState([]); // places added to this day
+  const [start, setStart] = useState(null); // starting point for this day
   const [plannedElsewhere, setPlannedElsewhere] = useState({}); // place id -> [day numbers]
   const [profile, setProfile] = useState(null);
   const [places, setPlaces] = useState([]);
@@ -63,6 +66,7 @@ export default function DayDetailsPage() {
     // Older versions saved ids of generic suggestions; keep only real places.
     const stored = getDayActivities(t, dayKey(selected.date));
     setSaved(stored.filter((item) => item && typeof item === "object"));
+    setStart(getDayStart(t, dayKey(selected.date)));
 
     // Which places are already planned on the trip's other days.
     const elsewhere = {};
@@ -171,6 +175,20 @@ export default function DayDetailsPage() {
     };
   }, [missingKey, trip, selectedDay]);
 
+  // Sets (or removes) this day's starting point. With applyToOtherDays, days
+  // of the trip that have no starting point get the same one.
+  const changeStart = (next, applyToOtherDays) => {
+    if (!trip || !selectedDay) return;
+    setStart(next);
+    saveDayStart(trip, dayKey(selectedDay.date), next);
+    if (next && applyToOtherDays) {
+      days.forEach((d) => {
+        const key = dayKey(d.date);
+        if (!getDayStart(trip, key)) saveDayStart(trip, key, next);
+      });
+    }
+  };
+
   const reorderPlan = (next) => {
     if (!trip || !selectedDay) return;
     setSaved(next);
@@ -236,6 +254,9 @@ export default function DayDetailsPage() {
           plannedElsewhere={plannedElsewhere}
           onToggleSave={toggleSave}
           onReorder={reorderPlan}
+          start={start}
+          onStartChange={changeStart}
+          tripPlaceId={trip.placeId ?? null}
           profile={profile}
           onSaveProfile={handleSaveProfile}
         />

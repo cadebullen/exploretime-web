@@ -385,6 +385,9 @@ export default function DayActivities({
   plannedElsewhere = {},
   onToggleSave,
   onReorder,
+  start = null,
+  onStartChange,
+  tripPlaceId = null,
   profile,
   onSaveProfile,
 }) {
@@ -697,6 +700,9 @@ export default function DayActivities({
               plan={saved}
               onChange={onReorder}
               onRemove={onToggleSave}
+              start={start}
+              onStartChange={onStartChange}
+              tripPlaceId={tripPlaceId}
             />
           </section>
 
