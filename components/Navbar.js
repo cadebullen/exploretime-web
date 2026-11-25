@@ -27,7 +27,7 @@ export default function Navbar() {
 
   return (
     <nav className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-8 h-16 flex items-center justify-between">
+      <div className="max-w-[1600px] mx-auto px-6 lg:px-10 2xl:px-16 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <Link href="/onboarding" className="flex items-center gap-2.5">
             <span className="text-xl">🌍</span>

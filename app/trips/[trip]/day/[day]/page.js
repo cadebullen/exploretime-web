@@ -207,7 +207,7 @@ export default function DayDetailsPage() {
     <div className="min-h-screen bg-black text-white">
       <Navbar />
 
-      <main className="max-w-5xl mx-auto px-8 py-10 space-y-8">
+      <main className="max-w-[1600px] mx-auto px-6 lg:px-10 2xl:px-16 py-10 space-y-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-widest text-white/40 font-semibold">

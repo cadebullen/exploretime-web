@@ -180,7 +180,7 @@ export default function HomePage() {
       <div className="min-h-screen bg-black text-white">
         <Navbar />
 
-        <main className="max-w-7xl mx-auto px-8 py-10">
+        <main className="max-w-[1600px] mx-auto px-6 lg:px-10 2xl:px-16 py-10">
           <div className="flex gap-8 items-start">
             {/* ── Main content ── */}
             <div className="flex-1 min-w-0 space-y-8">

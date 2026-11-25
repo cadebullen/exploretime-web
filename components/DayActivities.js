@@ -774,7 +774,7 @@ export default function DayActivities({
                         : `No ${timeOfDay.toLowerCase()} activities found for your interests. Try another time of day, or add interests with Change preferences.`}
                     </p>
                   ) : (
-                    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
                       {lists[kind].shown.map((place) => (
                         <PlaceCard
                           key={place.id}

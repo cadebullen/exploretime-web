@@ -151,7 +151,7 @@ export default function DayPlanner({
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] xl:gap-8 lg:items-start">
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-sm">
           <span className="text-white/50">Travel by</span>
@@ -195,7 +195,7 @@ export default function DayPlanner({
           legsByFromId={legsByFromId}
         />
       </div>
-      <div className="h-80 lg:h-[32rem]">
+      <div className="h-80 lg:h-[34rem] 2xl:h-[40rem]">
         <DayMap
           plan={ordered}
           start={start}
