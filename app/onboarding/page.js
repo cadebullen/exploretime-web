@@ -10,6 +10,7 @@ import {
   ACCENT,
   ACCENT_INK,
   formatDate as formatShortDate,
+  nextRange,
 } from "@/lib/utils";
 
 const BACKGROUND_IMAGE = "/onboarding_bg.jpg";
@@ -44,13 +45,8 @@ export default function OnboardingPage() {
   }, []);
   const hasTrips = trips.length > 0;
 
-  const handleRangeSelect = (selected, day) => {
-    // With a full range picked, the next click starts a new range.
-    if (day && range.from && range.to) {
-      setRange({ from: day, to: undefined });
-      return;
-    }
-    setRange(selected ?? { from: undefined, to: undefined });
+  const handleRangeSelect = (_selected, day) => {
+    setRange((r) => nextRange(r, day));
   };
 
   const fetchSuggestions = useCallback((text) => {

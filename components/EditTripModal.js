@@ -5,7 +5,7 @@ import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { updateTrip } from "@/lib/storage";
 
-import { ACCENT, ACCENT_INK } from "@/lib/utils";
+import { ACCENT, ACCENT_INK, nextRange } from "@/lib/utils";
 
 function fmt(date) {
   if (!date) return "";
@@ -31,19 +31,8 @@ export default function EditTripModal({ trip, onClose, onSave }) {
     to: toDate(trip.endDate),
   });
 
-  const handleRangeSelect = (selected, day) => {
-    if (!day) {
-      setRange(selected);
-      return;
-    }
-
-    // If a full range is already selected, a new click starts a fresh range.
-    if (range.from && range.to) {
-      setRange({ from: day, to: undefined });
-      return;
-    }
-
-    setRange(selected ?? { from: day, to: undefined });
+  const handleRangeSelect = (_selected, day) => {
+    setRange((r) => nextRange(r, day));
   };
 
   const debounce = useRef(null);
