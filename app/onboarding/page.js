@@ -4,9 +4,9 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { useRouter } from "next/navigation";
-import { addTrip, getTrips } from "@/lib/storage";
+import { addTrip, getTrips, setActiveTrip } from "@/lib/storage";
 
-const ACCENT = "#FF9F43";
+import { ACCENT, formatDate as formatShortDate } from "@/lib/utils";
 
 const BACKGROUND_IMAGE = "/onboarding_bg.jpg";
 
@@ -34,10 +34,11 @@ export default function OnboardingPage() {
   const [range, setRange] = useState({ from: undefined, to: undefined });
 
   // Whether the user already has trips (so they can go back to them)
-  const [hasTrips, setHasTrips] = useState(false);
+  const [trips, setTrips] = useState([]);
   useEffect(() => {
-    setHasTrips(getTrips().length > 0);
+    setTrips(getTrips());
   }, []);
+  const hasTrips = trips.length > 0;
 
   const fetchSuggestions = useCallback((text) => {
     if (!text.trim()) {
@@ -113,7 +114,7 @@ export default function OnboardingPage() {
 
       <div className="min-h-screen bg-black flex">
         {/* ── Left branding panel (desktop only) ── */}
-        <div className="hidden lg:flex w-105 shrink-0 bg-zinc-950 border-r border-white/10 flex-col justify-between p-12">
+        <div className="hidden lg:flex w-96 shrink-0 bg-zinc-950 border-r border-white/10 flex-col justify-between p-12">
           <div>
             <div className="flex items-center gap-2.5 mb-16">
               <span className="text-2xl">🌍</span>
@@ -125,13 +126,12 @@ export default function OnboardingPage() {
               day by day.
             </h2>
             <p className="text-slate-400 text-sm leading-relaxed">
-              Smart itineraries, live flight tracking, currency conversions, and
-              local news — all in one place.
+              Choose where you&apos;re headed and when, then plan each day with
+              suggested activities, the local weather and currency rates.
             </p>
-          </div>
 
           {/* Step indicators */}
-          <div className="space-y-3 my-12">
+          <div className="space-y-3 mt-10">
             {["Choose a destination", "Pick your dates"].map((label, i) => (
               <div
                 key={i}
@@ -153,11 +153,41 @@ export default function OnboardingPage() {
             ))}
           </div>
 
-          <p className="text-white/20 text-xs leading-relaxed">
+          {hasTrips && (
+            <div className="mt-12">
+              <p className="text-sm font-semibold text-white/60 mb-3">
+                Your trips
+              </p>
+              <ul className="space-y-1">
+                {trips.map((t) => (
+                  <li key={t.id}>
+                    <button
+                      onClick={() => {
+                        setActiveTrip(t.id);
+                        router.push("/home");
+                      }}
+                      className="w-full text-left rounded-lg px-3 py-2 -mx-3 hover:bg-white/5 transition-colors"
+                    >
+                      <span className="block text-sm text-white truncate">
+                        {t.destination.split(",")[0]}
+                      </span>
+                      <span className="block text-xs text-white/40">
+                        {formatShortDate(t.startDate)} to{" "}
+                        {formatShortDate(t.endDate)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          </div>
+
+          <p className="text-white/45 text-xs leading-relaxed">
             "The world is a book and those who do not travel read only one
             page."
             <br />
-            <span className="text-white/30">— Saint Augustine</span>
+            <span className="text-white/60">— Saint Augustine</span>
           </p>
         </div>
 
@@ -192,19 +222,19 @@ export default function OnboardingPage() {
             ))}
           </div>
 
-          <div className="max-w-md w-full z-10">
+          <div className="max-w-lg w-full z-10 mx-auto lg:mx-0">
             {/* ── Step 0: Destination ── */}
             {step === 0 && (
-              <div className="bg-white/[0.06] backdrop-blur-xl border border-white/15 p-8 rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] max-w-md w-full">
-                <p className="text-blue-200/70 text-xs font-semibold uppercase tracking-widest mb-2 drop-shadow-sm">
+              <div className="bg-white/[0.06] backdrop-blur-xl border border-white/15 p-8 sm:p-10 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] w-full">
+                <p className="text-[#B4C0FF] text-sm font-medium mb-2 drop-shadow-sm">
                   Step 1 of 2
                 </p>
-                <h1 className="text-3xl font-bold text-white mb-6 tracking-tight drop-shadow">
+                <h1 className="text-4xl font-bold text-white mb-7 tracking-tight drop-shadow">
                   Where are you going?
                 </h1>
 
                 <div className="relative">
-                  <div className="flex items-center border border-white/10 rounded-xl px-4 py-3 bg-white/5 focus-within:border-[#FF9F43] focus-within:bg-white/10 transition-all shadow-inner">
+                  <div className="flex items-center border border-white/10 rounded-xl px-4 py-3.5 bg-white/5 focus-within:border-[#4F6DF5] focus-within:bg-white/10 transition-all shadow-inner">
                     {/* SVG Icon */}
                     <svg
                       className="w-4 h-4 text-white/50 mr-3 shrink-0"
@@ -249,7 +279,7 @@ export default function OnboardingPage() {
                           <div className="font-semibold text-white text-sm">
                             {s.structured_formatting.main_text}
                           </div>
-                          <div className="text-blue-200/50 text-xs mt-0.5">
+                          <div className="text-white/50 text-xs mt-0.5">
                             {s.structured_formatting.secondary_text}
                           </div>
                         </button>
@@ -261,24 +291,23 @@ export default function OnboardingPage() {
                 <button
                   onClick={() => setStep(1)}
                   disabled={!destination}
-                  className="mt-6 w-full py-3 rounded-xl text-white text-sm font-semibold transition-all shadow-lg hover:brightness-110 active:scale-[0.99]"
-                  style={{
-                    backgroundColor: ACCENT,
-                    opacity: destination ? 1 : 0.4,
-                    cursor: destination ? "pointer" : "not-allowed",
-                  }}
+                  className={`mt-7 w-full py-3.5 rounded-xl text-sm font-semibold transition-all ${
+                    destination
+                      ? "bg-gradient-to-r from-[#4F6DF5] to-[#7C3AED] text-white shadow-lg hover:brightness-110 active:scale-[0.99]"
+                      : "bg-white/10 text-white/40 cursor-not-allowed"
+                  }`}
                 >
-                  Continue →
+                  Continue
                 </button>
               </div>
             )}
 
             {/* ── Step 1: Dates ── */}
             {step === 1 && (
-              <div className="bg-white/[0.06] backdrop-blur-xl border border-white/15 p-8 rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] max-w-md w-full">
+              <div className="bg-white/[0.06] backdrop-blur-xl border border-white/15 p-8 sm:p-10 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] w-full">
                 <button
                   onClick={() => setStep(0)}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white/70 transition-colors mb-6 uppercase tracking-widest"
+                  className="flex items-center gap-1.5 text-sm font-medium text-slate-300 hover:text-white transition-colors mb-6"
                 >
                   <svg
                     className="w-3.5 h-3.5"
@@ -293,15 +322,18 @@ export default function OnboardingPage() {
                       d="M15 19l-7-7 7-7"
                     />
                   </svg>
-                  Step 1 of 2
+                  Back
                 </button>
+                <p className="text-[#B4C0FF] text-sm font-medium mb-2 drop-shadow-sm">
+                  Step 2 of 2
+                </p>
 
-                <h1 className="text-3xl font-bold text-white mb-1 tracking-tight drop-shadow">
+                <h1 className="text-4xl font-bold text-white mb-1 tracking-tight drop-shadow">
                   When are you going?
                 </h1>
                 <p
                   className="text-sm font-medium mb-6"
-                  style={{ color: destination ? ACCENT : "transparent" }}
+                  style={{ color: destination ? "#B4C0FF" : "transparent" }}
                 >
                   ✈️ {destination?.name}
                 </p>
@@ -331,14 +363,14 @@ export default function OnboardingPage() {
                     modifiersStyles={{
                       selected: {
                         backgroundColor: ACCENT,
-                        color: "#111",
+                        color: "#fff",
                         fontWeight: 600,
                       },
                       range_middle: {
-                        backgroundColor: ACCENT + "25",
+                        backgroundColor: ACCENT + "40",
                         color: "#fff",
                       },
-                      today: { color: ACCENT, fontWeight: 700 },
+                      today: { color: "#B4C0FF", fontWeight: 700 },
                       outside: { color: "rgba(255,255,255,0.2)" },
                       disabled: { color: "rgba(255,255,255,0.1)" },
                     }}
@@ -348,14 +380,13 @@ export default function OnboardingPage() {
                 <button
                   onClick={handleConfirm}
                   disabled={!datesReady}
-                  className="mt-6 w-full py-3 rounded-xl text-white text-sm font-semibold transition-all shadow-lg hover:brightness-110 active:scale-[0.99]"
-                  style={{
-                    backgroundColor: ACCENT,
-                    opacity: datesReady ? 1 : 0.35,
-                    cursor: datesReady ? "pointer" : "not-allowed",
-                  }}
+                  className={`mt-7 w-full py-3.5 rounded-xl text-sm font-semibold transition-all ${
+                    datesReady
+                      ? "bg-gradient-to-r from-[#4F6DF5] to-[#7C3AED] text-white shadow-lg hover:brightness-110 active:scale-[0.99]"
+                      : "bg-white/10 text-white/40 cursor-not-allowed"
+                  }`}
                 >
-                  Let's Plan ✈️
+                  Plan my trip
                 </button>
               </div>
             )}
