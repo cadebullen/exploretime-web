@@ -143,6 +143,12 @@ export default function DayDetailsPage() {
     saveDayActivities(trip, dayKey(selectedDay.date), next);
   };
 
+  const reorderPlan = (next) => {
+    if (!trip || !selectedDay) return;
+    setSaved(next);
+    saveDayActivities(trip, dayKey(selectedDay.date), next);
+  };
+
   const handleSaveProfile = (nextProfile) => {
     if (!trip) return;
     setProfile(nextProfile);
@@ -201,6 +207,7 @@ export default function DayDetailsPage() {
           saved={saved}
           plannedElsewhere={plannedElsewhere}
           onToggleSave={toggleSave}
+          onReorder={reorderPlan}
           profile={profile}
           onSaveProfile={handleSaveProfile}
         />

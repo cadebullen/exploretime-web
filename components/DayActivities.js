@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { placeKind, priceLabel } from "@/lib/placeCategories";
 import { hoursLabel, openTimesOfDay } from "@/lib/openingHours";
+import DayPlan from "@/components/DayPlan";
 
 const TOTAL_STEPS = 4;
 const BLOCKS = ["Morning", "Afternoon", "Evening"];
@@ -379,6 +380,7 @@ export default function DayActivities({
   saved = [],
   plannedElsewhere = {},
   onToggleSave,
+  onReorder,
   profile,
   onSaveProfile,
 }) {
@@ -687,52 +689,11 @@ export default function DayActivities({
             <h2 className="text-lg font-semibold text-white mb-3">
               Your plan for this day
             </h2>
-            {saved.length === 0 ? (
-              <p className="text-sm text-white/45">
-                Nothing planned yet. Add places from the suggestions below.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {BLOCKS.flatMap((block) =>
-                  saved
-                    .filter((p) => p.timeBlock === block)
-                    .map((p) => (
-                      <li
-                        key={p.id}
-                        className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3"
-                      >
-                        <span className="w-20 shrink-0 text-xs text-white/45">
-                          {block}
-                        </span>
-                        <span className="flex-1 min-w-0">
-                          <span className="block text-sm font-medium text-white truncate">
-                            {p.name}
-                          </span>
-                          <span className="block text-xs text-white/40 truncate">
-                            {p.category}
-                            {p.address ? ` · ${p.address}` : ""}
-                          </span>
-                        </span>
-                        <a
-                          href={p.mapsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-white/60 hover:text-white"
-                        >
-                          Map
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => onToggleSave(p)}
-                          className="text-xs text-white/50 hover:text-white"
-                        >
-                          Remove
-                        </button>
-                      </li>
-                    )),
-                )}
-              </ul>
-            )}
+            <DayPlan
+              plan={saved}
+              onChange={onReorder}
+              onRemove={onToggleSave}
+            />
           </section>
 
           <section className="space-y-8">
