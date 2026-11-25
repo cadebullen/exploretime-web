@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
-import { saveTrip } from "@/lib/storage";
+import { updateTrip } from "@/lib/storage";
 
 const ACCENT = "#4F6DF5";
 
@@ -86,13 +86,12 @@ export default function EditTripModal({ trip, onClose, onSave }) {
 
   const handleSave = () => {
     if (!canSave) return;
-    const updated = {
+    const updated = updateTrip(trip.id, {
       destination: destination.name,
       placeId: destination.placeId,
       startDate: range.from.toISOString(),
       endDate: range.to.toISOString(),
-    };
-    saveTrip(updated);
+    });
     onSave(updated);
   };
 

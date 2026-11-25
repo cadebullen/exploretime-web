@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ACCENT,
@@ -8,15 +8,22 @@ import {
   getCityName,
   getCurrencyForCity,
 } from "@/lib/utils";
-import { getTrip } from "@/lib/storage";
+import {
+  getActiveTrip,
+  getTrips,
+  setActiveTrip,
+  deleteTrip,
+} from "@/lib/storage";
 import Navbar from "@/components/Navbar";
 import TripCard from "@/components/TripCard";
 import DayCard from "@/components/DayCard";
 import InfoCard from "@/components/InfoCard";
 import EditTripModal from "@/components/EditTripModal";
+import TripsRow from "@/components/TripsRow";
 
 export default function HomePage() {
   const router = useRouter();
+  const [trips, setTrips] = useState([]);
   const [trip, setTrip] = useState(null);
   const [days, setDays] = useState([]);
   const [currency, setCurrency] = useState(null); // { from, to, rate }
@@ -31,40 +38,71 @@ export default function HomePage() {
   const [weather, setWeather] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  // Incremented on every trip switch so late responses for an old trip are ignored.
+  const loadId = useRef(0);
 
-  useEffect(() => {
-    const t = getTrip();
-    if (!t) {
-      router.replace("/onboarding");
-      return;
-    }
+  // Loads the itinerary, currency and weather for the given trip.
+  const showTrip = (t, from = fromCur) => {
+    const id = ++loadId.current;
+    const current = () => id === loadId.current;
     setTrip(t);
     setDays(getDaysArray(t.startDate, t.endDate));
 
-    // Set destination currency and fetch initial rate
     const dest = getCurrencyForCity(t.destination);
     setToCur(dest);
     setToSearch(dest);
-    setCurLoading(true);
-    fetch(`/api/currency?from=USD&to=${dest}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.rate) setCurrency(d);
-      })
-      .catch(() => {})
-      .finally(() => setCurLoading(false));
+    setCurrency(null);
+    if (from !== dest) {
+      setCurLoading(true);
+      fetch(`/api/currency?from=${from}&to=${dest}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (current() && d.rate) setCurrency(d);
+        })
+        .catch(() => {})
+        .finally(() => current() && setCurLoading(false));
+    }
 
-    // Fetch live weather
     const city = getCityName(t.destination);
+    setWeather(null);
     setWeatherLoading(true);
     fetch(`/api/weather?city=${encodeURIComponent(city)}`)
       .then((r) => r.json())
       .then((d) => {
-        if (d.temp !== undefined) setWeather(d);
+        if (current() && d.temp !== undefined) setWeather(d);
       })
       .catch(() => {})
-      .finally(() => setWeatherLoading(false));
+      .finally(() => current() && setWeatherLoading(false));
+  };
+
+  useEffect(() => {
+    const t = getActiveTrip();
+    if (!t) {
+      router.replace("/onboarding");
+      return;
+    }
+    setTrips(getTrips());
+    showTrip(t, "USD");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  const handleSelectTrip = (id) => {
+    if (id === trip?.id) return;
+    setActiveTrip(id);
+    const next = getTrips().find((t) => t.id === id);
+    if (next) showTrip(next);
+  };
+
+  const handleDeleteTrip = () => {
+    deleteTrip(trip.id);
+    const next = getActiveTrip();
+    if (!next) {
+      router.replace("/onboarding");
+      return;
+    }
+    setTrips(getTrips());
+    showTrip(next);
+  };
 
   if (!trip) return null;
 
@@ -136,11 +174,20 @@ export default function HomePage() {
           <div className="flex gap-8 items-start">
             {/* ── Main content ── */}
             <div className="flex-1 min-w-0 space-y-8">
+              <TripsRow
+                trips={trips}
+                activeId={trip.id}
+                onSelect={handleSelectTrip}
+                onAdd={() => router.push("/onboarding")}
+              />
+
               {/* Hero */}
               <TripCard
+                key={trip.id}
                 trip={trip}
                 dayCount={days.length}
                 onEdit={() => setShowEdit(true)}
+                onDelete={handleDeleteTrip}
               />
 
               {/* Itinerary grid */}
@@ -346,29 +393,8 @@ export default function HomePage() {
           onClose={() => setShowEdit(false)}
           onSave={(updated) => {
             setShowEdit(false);
-            setTrip(updated);
-            const newDays = getDaysArray(updated.startDate, updated.endDate);
-            setDays(newDays);
-            const dest = getCurrencyForCity(updated.destination);
-            setToCur(dest);
-            setToSearch(dest);
-            setCurLoading(true);
-            fetch(`/api/currency?from=${fromCur}&to=${dest}`)
-              .then((r) => r.json())
-              .then((d) => {
-                if (d.rate) setCurrency(d);
-              })
-              .catch(() => {})
-              .finally(() => setCurLoading(false));
-            const city = getCityName(updated.destination);
-            setWeatherLoading(true);
-            fetch(`/api/weather?city=${encodeURIComponent(city)}`)
-              .then((r) => r.json())
-              .then((d) => {
-                if (d.temp !== undefined) setWeather(d);
-              })
-              .catch(() => {})
-              .finally(() => setWeatherLoading(false));
+            setTrips(getTrips());
+            showTrip(updated);
           }}
         />
       )}
