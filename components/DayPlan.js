@@ -134,9 +134,13 @@ export default function DayPlan({
                     <span className="block text-sm font-medium text-white truncate">
                       {p.name}
                     </span>
-                    <span className="block text-xs text-white/40 truncate">
+                    <span
+                      className={`block text-xs truncate ${
+                        legsByFromId[p.id]?.far ? "text-[#FFC48A]" : "text-white/40"
+                      }`}
+                    >
                       {legsByFromId[p.id]
-                        ? `Next stop: ${legsByFromId[p.id]}`
+                        ? `Next stop: ${legsByFromId[p.id].label}${legsByFromId[p.id].far ? " (far)" : ""}`
                         : `${p.category}${p.address ? ` · ${p.address}` : ""}`}
                     </span>
                   </button>

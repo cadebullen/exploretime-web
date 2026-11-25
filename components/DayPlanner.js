@@ -4,9 +4,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DayPlan from "@/components/DayPlan";
 import DayMap, { legLabel } from "@/components/DayMap";
 import StartPointPicker from "@/components/StartPointPicker";
-import { orderPlan } from "@/lib/planOrder";
+import { orderPlan, shortestOrder, isShortestOrder } from "@/lib/planOrder";
 
-// The day's plan as a list and a map side by side. Both show the same order:
+// True on screens at least `lg` (1024px) wide.
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return isDesktop;
+}
+
+// The day's plan as a list and a map side by side (on phones the map opens
+// full screen from a "View map" button). Both show the same order:
 // reordering in either one updates the other.
 export default function DayPlanner({
   plan,
@@ -22,6 +36,25 @@ export default function DayPlanner({
   const [route, setRoute] = useState(null);
   const [routeError, setRouteError] = useState(null);
   const [pickingStart, setPickingStart] = useState(false);
+  const isDesktop = useIsDesktop();
+  const [mapOpen, setMapOpen] = useState(false);
+
+  // Full-screen map on phones: close with Escape, and stop the page behind
+  // it from scrolling.
+  useEffect(() => {
+    if (!mapOpen) return;
+    const onKey = (e) => e.key === "Escape" && setMapOpen(false);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = overflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [mapOpen]);
+  useEffect(() => {
+    if (isDesktop) setMapOpen(false);
+  }, [isDesktop]);
 
   // Route from the starting point (if any) through the stops that have
   // coordinates, in plan order.
@@ -66,15 +99,47 @@ export default function DayPlanner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stopsKey, mode]);
 
-  // Travel time from each place to the next one that has coordinates.
+  // Travel time from each place to the next one that has coordinates, and
+  // whether that's a long way (over 45 minutes).
   const legsByFromId = useMemo(() => {
     const out = {};
     if (!route?.legs) return out;
     route.legs.forEach((leg, i) => {
-      if (stops[i]) out[stops[i].id] = legLabel(leg, mode);
+      if (stops[i]) {
+        out[stops[i].id] = {
+          label: legLabel(leg, mode),
+          far: leg.durationSec > 45 * 60,
+        };
+      }
     });
     return out;
   }, [route, stops, mode]);
+  const anyFar = Object.values(legsByFromId).some((l) => l.far);
+
+  // Shortest order, with one step of undo.
+  const [beforeShortest, setBeforeShortest] = useState(null);
+  const locatedCount = ordered.filter((p) => p.location).length;
+  const alreadyShortest = useMemo(
+    () => isShortestOrder(ordered, start),
+    [ordered, start],
+  );
+  const applyShortest = () => {
+    setBeforeShortest(ordered);
+    onChangeRef.current(shortestOrder(ordered, start));
+  };
+  const undoShortest = () => {
+    if (beforeShortest) onChangeRef.current(beforeShortest);
+    setBeforeShortest(null);
+  };
+  // Any other change to the plan ends the chance to undo.
+  const lastAppliedRef = useRef(null);
+  useEffect(() => {
+    const key = ordered.map((p) => p.id).join(",");
+    if (beforeShortest && lastAppliedRef.current && key !== lastAppliedRef.current) {
+      setBeforeShortest(null);
+    }
+    lastAppliedRef.current = beforeShortest ? key : null;
+  }, [ordered, beforeShortest]);
 
   const handleSelect = useCallback((id) => setSelectedId(id), []);
   // Keep a stable callback for the map while always calling the latest
@@ -84,6 +149,18 @@ export default function DayPlanner({
     onChangeRef.current = onChange;
   }, [onChange]);
   const handleChange = useCallback((next) => onChangeRef.current(next), []);
+
+  const map = (
+    <DayMap
+      plan={ordered}
+      start={start}
+      mode={mode}
+      route={route}
+      selectedId={selectedId}
+      onSelect={handleSelect}
+      onChange={handleChange}
+    />
+  );
 
   const startSection = pickingStart ? (
     <StartPointPicker
@@ -108,9 +185,13 @@ export default function DayPlanner({
         <span className="block text-sm font-medium text-white truncate">
           Start: {start.name}
         </span>
-        <span className="block text-xs text-white/40 truncate">
+        <span
+          className={`block text-xs truncate ${
+            legsByFromId.start?.far ? "text-[#FFC48A]" : "text-white/40"
+          }`}
+        >
           {legsByFromId.start
-            ? `First stop: ${legsByFromId.start}`
+            ? `First stop: ${legsByFromId.start.label}${legsByFromId.start.far ? " (far)" : ""}`
             : start.address}
         </span>
       </button>
@@ -153,7 +234,7 @@ export default function DayPlanner({
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] xl:gap-8 lg:items-start">
       <div className="space-y-3">
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-white/50">Travel by</span>
           {[
             ["WALK", "Walking"],
@@ -173,7 +254,50 @@ export default function DayPlanner({
               {label}
             </button>
           ))}
+          {!isDesktop && (
+            <button
+              type="button"
+              onClick={() => setMapOpen(true)}
+              className="ml-auto rounded-lg px-3 py-1.5 bg-[#FF9F43] text-[#1A1006] font-semibold"
+            >
+              View map
+            </button>
+          )}
         </div>
+        {locatedCount >= 2 && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            {beforeShortest ? (
+              <>
+                <span className="text-white/70">
+                  Reordered for the shortest route.
+                </span>
+                <button
+                  type="button"
+                  onClick={undoShortest}
+                  className="text-white underline underline-offset-2 hover:no-underline"
+                >
+                  Undo
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={applyShortest}
+                disabled={alreadyShortest}
+                className="rounded-lg border border-white/15 px-3 py-1.5 text-white/80 hover:text-white hover:border-white/30 disabled:opacity-40 disabled:hover:text-white/80 disabled:hover:border-white/15"
+              >
+                {alreadyShortest ? "Already the shortest route" : "Reorder for shortest route"}
+              </button>
+            )}
+          </div>
+        )}
+        {anyFar && (
+          <p className="text-xs text-[#FFC48A]">
+            {mode === "WALK"
+              ? "Some stops are over 45 minutes apart on foot. Try Driving, reorder for the shortest route, or move far places to another day."
+              : "Some stops are over 45 minutes apart. Reorder for the shortest route, or move far places to another day."}
+          </p>
+        )}
         {routeError && (
           <p className="text-xs text-white/50">
             Travel times unavailable ({routeError}). Check that the Routes API
@@ -195,17 +319,35 @@ export default function DayPlanner({
           legsByFromId={legsByFromId}
         />
       </div>
-      <div className="h-80 lg:h-[34rem] 2xl:h-[40rem]">
-        <DayMap
-          plan={ordered}
-          start={start}
-          mode={mode}
-          route={route}
-          selectedId={selectedId}
-          onSelect={handleSelect}
-          onChange={handleChange}
-        />
-      </div>
+      {isDesktop ? (
+        <div className="h-[34rem] 2xl:h-[40rem]">{map}</div>
+      ) : (
+        mapOpen && (
+          <div
+            className="fixed inset-0 z-[60] flex flex-col bg-black"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Map of this day's plan"
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+              <p className="text-sm font-semibold text-white">
+                {ordered.length} stop{ordered.length === 1 ? "" : "s"}
+                {start ? ` from ${start.name}` : ""}
+              </p>
+              <button
+                type="button"
+                onClick={() => setMapOpen(false)}
+                className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-white"
+              >
+                Close
+              </button>
+            </div>
+            <div className="relative flex-1 [&>div]:absolute [&>div]:inset-0 [&>div]:rounded-none [&>div]:border-0">
+              {map}
+            </div>
+          </div>
+        )
+      )}
     </div>
   );
 }
