@@ -7,7 +7,7 @@ import StartPointPicker from "@/components/StartPointPicker";
 import AddPlacePicker from "@/components/AddPlacePicker";
 import { availabilityAt, formatClock, TIME_RANGE_LABELS } from "@/lib/openingHours";
 import { buildTimeline } from "@/lib/timeline";
-import { buildIcs, estimateSpend } from "@/lib/dayExport";
+import { buildIcs, estimateSpend, googleMapsLinks } from "@/lib/dayExport";
 import { orderPlan, shortestOrder, isShortestOrder } from "@/lib/planOrder";
 
 // True on screens at least `lg` (1024px) wide.
@@ -231,6 +231,17 @@ export default function DayPlanner({
     onChangeRef.current([...ordered, place]);
   };
   const spend = useMemo(() => estimateSpend(ordered), [ordered]);
+
+  // Directions in Google Maps, in plan order (from the starting point).
+  const mapsLinks = useMemo(
+    () =>
+      googleMapsLinks(
+        stops.map((p) => (p.id === "start" ? { ...p, id: start?.id } : p)),
+        (route?.legs ?? []).map((l) => l.mode),
+      ),
+    [stops, start, route],
+  );
+  const [mapsMenuOpen, setMapsMenuOpen] = useState(false);
 
   const downloadCalendar = () => {
     if (!date) return;
@@ -515,6 +526,49 @@ export default function DayPlanner({
             )}
           </span>
           <span className="ml-auto flex gap-2 print:hidden">
+            {mapsLinks.length === 1 && (
+              <a
+                href={mapsLinks[0].url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`Directions through every stop in order (${mapsLinks[0].mode})`}
+                className="rounded-lg border border-white/15 px-3 py-1.5 text-white/80 hover:text-white hover:border-white/30"
+              >
+                Open in Google Maps
+              </a>
+            )}
+            {mapsLinks.length > 1 && (
+              <span className="relative">
+                <button
+                  type="button"
+                  onClick={() => setMapsMenuOpen((o) => !o)}
+                  aria-expanded={mapsMenuOpen}
+                  className="rounded-lg border border-white/15 px-3 py-1.5 text-white/80 hover:text-white hover:border-white/30"
+                >
+                  Open in Google Maps ▾
+                </button>
+                {mapsMenuOpen && (
+                  <span className="absolute right-0 z-20 mt-1 w-72 rounded-lg border border-white/15 bg-zinc-900 p-1 shadow-xl">
+                    <span className="block px-2 py-1 text-xs text-white/45">
+                      Google Maps takes up to 11 stops per route, so this day
+                      is split into parts.
+                    </span>
+                    {mapsLinks.map((l) => (
+                      <a
+                        key={l.url}
+                        href={l.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setMapsMenuOpen(false)}
+                        className="block truncate rounded px-2 py-1.5 text-sm text-white/80 hover:bg-white/10 hover:text-white"
+                      >
+                        {l.label}
+                      </a>
+                    ))}
+                  </span>
+                )}
+              </span>
+            )}
             <button
               type="button"
               onClick={downloadCalendar}
