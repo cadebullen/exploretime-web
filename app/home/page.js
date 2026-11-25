@@ -36,6 +36,7 @@ export default function HomePage() {
   const [showFromDrop, setShowFromDrop] = useState(false);
   const [showToDrop, setShowToDrop] = useState(false);
   const [weather, setWeather] = useState(null);
+  const [forecast, setForecast] = useState([]);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   // Incremented on every trip switch so late responses for an old trip are ignored.
@@ -63,13 +64,21 @@ export default function HomePage() {
         .finally(() => current() && setCurLoading(false));
     }
 
-    const city = getCityName(t.destination);
+    const weatherParams = new URLSearchParams({
+      city: getCityName(t.destination),
+      forecast: "true",
+      days: "3",
+    });
+    if (t.placeId) weatherParams.set("placeId", t.placeId);
     setWeather(null);
+    setForecast([]);
     setWeatherLoading(true);
-    fetch(`/api/weather?city=${encodeURIComponent(city)}`)
+    fetch(`/api/weather?${weatherParams}`)
       .then((r) => r.json())
       .then((d) => {
-        if (current() && d.temp !== undefined) setWeather(d);
+        if (!current() || !d.current) return;
+        setWeather(d.current);
+        setForecast(d.forecast ?? []);
       })
       .catch(() => {})
       .finally(() => current() && setWeatherLoading(false));
@@ -369,6 +378,34 @@ export default function HomePage() {
                       <span>💧 {weather.humidity}%</span>
                       <span>💨 {weather.wind} km/h</span>
                     </div>
+                    {forecast.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-white/10">
+                        {forecast.map((f, i) => (
+                          <div
+                            key={f.date}
+                            className="text-center"
+                            title={f.condition}
+                          >
+                            <p className="text-[11px] font-semibold text-white/50">
+                              {i === 0
+                                ? "Today"
+                                : new Date(`${f.date}T12:00:00`).toLocaleDateString(
+                                    "en-US",
+                                    { weekday: "short" },
+                                  )}
+                            </p>
+                            <p className="text-xl my-1">{f.icon}</p>
+                            <p className="text-xs">
+                              <span className="font-semibold">{f.maxTemp}°</span>{" "}
+                              <span className="text-white/40">{f.minTemp}°</span>
+                            </p>
+                            <p className="text-[10px] text-white/35 mt-0.5">
+                              🌧 {f.rain}%
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <p className="text-xs text-white/30">Weather unavailable</p>
