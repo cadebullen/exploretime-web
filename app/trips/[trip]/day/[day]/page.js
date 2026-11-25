@@ -135,6 +135,7 @@ export default function DayDetailsPage() {
             photoName: place.photoName ?? null,
             photoRef: place.photoRef ?? null,
             hours: place.hours ?? null,
+            location: place.location ?? null,
             mapsUrl: place.mapsUrl,
           },
         ];
@@ -142,6 +143,33 @@ export default function DayDetailsPage() {
     setSaved(next);
     saveDayActivities(trip, dayKey(selectedDay.date), next);
   };
+
+  // Places saved before places carried coordinates: look them up once and
+  // store them, so they can appear on the map.
+  const missingKey = saved
+    .filter((p) => !p.location)
+    .map((p) => p.id)
+    .join(",");
+  useEffect(() => {
+    if (!missingKey || !trip || !selectedDay) return;
+    let cancelled = false;
+    fetch(`/api/place-locations?ids=${encodeURIComponent(missingKey)}`)
+      .then((r) => r.json())
+      .then(({ locations = {} }) => {
+        if (cancelled || Object.keys(locations).length === 0) return;
+        setSaved((current) => {
+          const next = current.map((p) =>
+            p.location || !locations[p.id] ? p : { ...p, location: locations[p.id] },
+          );
+          saveDayActivities(trip, dayKey(selectedDay.date), next);
+          return next;
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [missingKey, trip, selectedDay]);
 
   const reorderPlan = (next) => {
     if (!trip || !selectedDay) return;

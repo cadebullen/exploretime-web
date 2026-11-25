@@ -12,11 +12,19 @@ import { TIME_RANGE_LABELS } from "@/lib/openingHours";
 
 // The places planned for one day, grouped by time of day. Reorder by dragging
 // (also between times of day) or with the up/down buttons.
-export default function DayPlan({ plan, onChange, onRemove }) {
+export default function DayPlan({
+  plan,
+  onChange,
+  onRemove,
+  selectedId = null,
+  onSelect = () => {},
+  legsByFromId = {},
+}) {
   const [draggingId, setDraggingId] = useState(null);
   const [dropTarget, setDropTarget] = useState(null); // "block:Morning" or a place id
 
   const ordered = orderPlan(plan);
+  const numberOf = (id) => ordered.findIndex((p) => p.id === id) + 1;
 
   if (ordered.length === 0) {
     return (
@@ -102,7 +110,9 @@ export default function DayPlan({ plan, onChange, onRemove }) {
                       ? "opacity-40 border-white/10"
                       : dropTarget === p.id
                         ? "border-[#FF9F43] shadow-[0_-2px_0_0_#FF9F43]"
-                        : "border-white/10"
+                        : selectedId === p.id
+                          ? "border-white/40"
+                          : "border-white/10"
                   }`}
                 >
                   <span
@@ -112,15 +122,30 @@ export default function DayPlan({ plan, onChange, onRemove }) {
                   >
                     ⋮⋮
                   </span>
-                  <span className="flex-1 min-w-0">
+                  <span
+                    className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-xs font-bold ${
+                      selectedId === p.id
+                        ? "bg-white text-[#1A1006]"
+                        : "bg-[#FF9F43] text-[#1A1006]"
+                    }`}
+                  >
+                    {numberOf(p.id)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(selectedId === p.id ? null : p.id)}
+                    className="flex-1 min-w-0 text-left"
+                    title="Show on map"
+                  >
                     <span className="block text-sm font-medium text-white truncate">
                       {p.name}
                     </span>
                     <span className="block text-xs text-white/40 truncate">
-                      {p.category}
-                      {p.address ? ` · ${p.address}` : ""}
+                      {legsByFromId[p.id]
+                        ? `Next stop: ${legsByFromId[p.id]}`
+                        : `${p.category}${p.address ? ` · ${p.address}` : ""}`}
                     </span>
-                  </span>
+                  </button>
                   <span className="flex items-center gap-1">
                     <button
                       type="button"

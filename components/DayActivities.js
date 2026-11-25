@@ -7,7 +7,7 @@ import {
   openTimesOfDay,
   TIME_RANGE_LABELS,
 } from "@/lib/openingHours";
-import DayPlan from "@/components/DayPlan";
+import DayPlanner from "@/components/DayPlanner";
 
 const TOTAL_STEPS = 4;
 const BLOCKS = ["Morning", "Afternoon", "Evening"];
@@ -693,7 +693,7 @@ export default function DayActivities({
             <h2 className="text-lg font-semibold text-white mb-3">
               Your plan for this day
             </h2>
-            <DayPlan
+            <DayPlanner
               plan={saved}
               onChange={onReorder}
               onRemove={onToggleSave}
