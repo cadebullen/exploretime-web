@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { placeKind, priceLabel } from "@/lib/placeCategories";
+import { hoursLabel, openTimesOfDay } from "@/lib/openingHours";
 
 const TOTAL_STEPS = 4;
 const BLOCKS = ["Morning", "Afternoon", "Evening"];
@@ -265,15 +266,21 @@ function placesForDay(ranked, dayIndex, refreshes = 0) {
   );
 }
 
-function PlaceCard({ place, isSaved, otherDays = [], onToggle }) {
+function PlaceCard({ place, date, isSaved, otherDays = [], onToggle }) {
   const price = priceLabel(place.priceLevel);
+  const hours = date ? hoursLabel(place.hours, date) : null;
+  const photoSrc = place.photoName
+    ? `/api/place-photo?name=${encodeURIComponent(place.photoName)}&w=480`
+    : place.photoRef
+      ? `/api/place-photo?ref=${encodeURIComponent(place.photoRef)}&w=480`
+      : null;
   return (
     <li className="rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden flex flex-col">
       <div className="aspect-[16/9] bg-white/5">
-        {place.photoRef && (
+        {photoSrc && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={`/api/place-photo?ref=${encodeURIComponent(place.photoRef)}&w=480`}
+            src={photoSrc}
             alt=""
             loading="lazy"
             className="w-full h-full object-cover"
@@ -295,6 +302,18 @@ function PlaceCard({ place, isSaved, otherDays = [], onToggle }) {
               <span className="text-white/35">
                 {" "}
                 ({place.ratingCount.toLocaleString()})
+              </span>
+            )}
+          </p>
+        )}
+        {hours && (
+          <p className="text-xs text-white/60 mt-1">
+            {hours}
+            {date && (
+              <span className="text-white/35">
+                {" "}
+                on{" "}
+                {date.toLocaleDateString("en-US", { weekday: "long" })}
               </span>
             )}
           </p>
@@ -340,6 +359,7 @@ export default function DayActivities({
   placesError = null,
   city = "",
   dayIndex = 0,
+  date = null,
   saved = [],
   plannedElsewhere = {},
   onToggleSave,
@@ -367,11 +387,22 @@ export default function DayActivities({
   // How many times each list was refreshed.
   const [refreshes, setRefreshes] = useState({ activity: 0, food: 0 });
 
-  // Suggestions for the chosen time of day, as two lists.
+  // Suggestions for the chosen time of day, as two lists. A place is shown
+  // for every time of day it is open on this day's date; places without
+  // opening hours use the time of day their search was meant for. Places
+  // whose search matches the time of day rank a little higher.
   const lists = useMemo(() => {
     const ranked = places
-      .filter((p) => p.timeBlock === timeOfDay)
-      .map((place) => ({ place, score: scorePlace(place, selectedProfile) }))
+      .filter((p) => {
+        const open = date ? openTimesOfDay(p.hours, date) : null;
+        return (open ?? [p.timeBlock]).includes(timeOfDay);
+      })
+      .map((place) => ({
+        place,
+        score:
+          scorePlace(place, selectedProfile) +
+          (place.timeBlock === timeOfDay ? 1 : 0),
+      }))
       .sort((a, b) => b.score - a.score)
       .map((item) => item.place);
     const forKind = (kind) => {
@@ -382,7 +413,7 @@ export default function DayActivities({
       };
     };
     return { activity: forKind("activity"), food: forKind("food") };
-  }, [places, selectedProfile, timeOfDay, dayIndex, refreshes]);
+  }, [places, selectedProfile, timeOfDay, dayIndex, refreshes, date]);
 
   const refreshList = (kind) =>
     setRefreshes((r) => ({ ...r, [kind]: r[kind] + 1 }));
@@ -761,9 +792,13 @@ export default function DayActivities({
                         <PlaceCard
                           key={place.id}
                           place={place}
+                          date={date}
                           isSaved={savedIds.has(place.id)}
                           otherDays={plannedElsewhere[place.id]}
-                          onToggle={onToggleSave}
+                          onToggle={(p) =>
+                            // Plan it for the time of day it was picked for.
+                            onToggleSave({ ...p, timeBlock: timeOfDay })
+                          }
                         />
                       ))}
                     </ul>

@@ -7,20 +7,10 @@ import {
 
 const RESULTS_PER_QUERY = 20; // the most one Places text search returns
 
-function toPlace(result, q) {
-  return {
-    id: result.place_id,
-    name: result.name,
-    address: result.formatted_address ?? "",
-    rating: result.rating ?? null,
-    ratingCount: result.user_ratings_total ?? 0,
-    priceLevel: result.price_level ?? null,
-    photoRef: result.photos?.[0]?.photo_reference ?? null,
-    category: q.category,
-    timeBlock: q.timeBlock,
-    interest: q.id,
-    mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(result.name)}&query_place_id=${result.place_id}`,
-  };
+// Adds where the place came from: its category, the time of day the search
+// is meant for (used when Google has no opening hours), and the interest.
+function withSource(place, q) {
+  return { ...place, category: q.category, timeBlock: q.timeBlock, interest: q.id };
 }
 
 // GET /api/recommendations?city=Lisbon&placeId=...&interests=museums,cafes
@@ -62,19 +52,16 @@ export async function GET(request) {
       console.error("[Recommendations]", queries[i].id, outcome.reason?.message);
       return;
     }
-    outcome.value
-      .filter((r) => r.business_status !== "CLOSED_PERMANENTLY")
-      .slice(0, RESULTS_PER_QUERY)
-      .forEach((r) => {
+    outcome.value.slice(0, RESULTS_PER_QUERY).forEach((r) => {
         // A place found by an interest search beats the same place from a
         // general search, since it matches what the user asked for.
-        const existing = byId.get(r.place_id);
+        const existing = byId.get(r.id);
         const isInterest = (id) => id in INTEREST_QUERIES;
         if (
           !existing ||
           (isInterest(queries[i].id) && !isInterest(existing.interest))
         ) {
-          byId.set(r.place_id, toPlace(r, queries[i]));
+          byId.set(r.id, withSource(r, queries[i]));
         }
       });
   });

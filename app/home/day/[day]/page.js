@@ -128,7 +128,9 @@ export default function DayDetailsPage() {
             timeBlock: place.timeBlock,
             rating: place.rating,
             priceLevel: place.priceLevel,
-            photoRef: place.photoRef,
+            photoName: place.photoName ?? null,
+            photoRef: place.photoRef ?? null,
+            hours: place.hours ?? null,
             mapsUrl: place.mapsUrl,
           },
         ];
@@ -191,6 +193,7 @@ export default function DayDetailsPage() {
           placesError={placesError}
           city={trip.destination.split(",")[0]}
           dayIndex={dayNumber - 1}
+          date={selectedDay.date}
           saved={saved}
           plannedElsewhere={plannedElsewhere}
           onToggleSave={toggleSave}
