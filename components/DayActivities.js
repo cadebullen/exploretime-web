@@ -714,7 +714,7 @@ export default function DayActivities({
                 >
                   {BLOCKS.map((b) => (
                     <option key={b} value={b}>
-                      {b} ({TIME_RANGE_LABELS[b]})
+                      {b}
                     </option>
                   ))}
                 </select>
