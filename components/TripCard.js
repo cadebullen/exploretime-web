@@ -1,7 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import { formatDate, getDaysUntil } from "@/lib/utils";
 
-export default function TripCard({ trip, dayCount, onEdit }) {
+export default function TripCard({ trip, dayCount, onEdit, onDelete }) {
   const daysUntil = getDaysUntil(trip.startDate);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
     <div
@@ -19,12 +23,44 @@ export default function TripCard({ trip, dayCount, onEdit }) {
           {formatDate(trip.startDate)} → {formatDate(trip.endDate)} · {dayCount}{" "}
           day{dayCount !== 1 ? "s" : ""}
         </p>
-        <button
-          onClick={onEdit}
-          className="mt-4 text-xs font-semibold text-white/60 hover:text-white border border-white/25 hover:border-white/50 rounded-lg px-3 py-1.5 transition-colors"
-        >
-          ✏️ Edit trip
-        </button>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            onClick={onEdit}
+            className="text-xs font-semibold text-white/60 hover:text-white border border-white/25 hover:border-white/50 rounded-lg px-3 py-1.5 transition-colors"
+          >
+            ✏️ Edit trip
+          </button>
+          {onDelete &&
+            (confirmDelete ? (
+              <>
+                <span className="text-xs text-white/80">
+                  Delete this trip and its plans?
+                </span>
+                <button
+                  onClick={() => {
+                    setConfirmDelete(false);
+                    onDelete();
+                  }}
+                  className="text-xs font-semibold text-white bg-red-500/80 hover:bg-red-500 rounded-lg px-3 py-1.5 transition-colors"
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="text-xs font-semibold text-white/60 hover:text-white px-2 py-1.5"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="text-xs font-semibold text-white/60 hover:text-white border border-white/25 hover:border-white/50 rounded-lg px-3 py-1.5 transition-colors"
+              >
+                🗑 Delete trip
+              </button>
+            ))}
+        </div>
       </div>
       <div className="sm:text-right shrink-0">
         {daysUntil > 0 ? (

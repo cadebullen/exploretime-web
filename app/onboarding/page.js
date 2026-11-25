@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { useRouter } from "next/navigation";
+import { addTrip, getTrips } from "@/lib/storage";
 
 const ACCENT = "#FF9F43";
 
@@ -31,6 +32,12 @@ export default function OnboardingPage() {
 
   // Dates
   const [range, setRange] = useState({ from: undefined, to: undefined });
+
+  // Whether the user already has trips (so they can go back to them)
+  const [hasTrips, setHasTrips] = useState(false);
+  useEffect(() => {
+    setHasTrips(getTrips().length > 0);
+  }, []);
 
   const fetchSuggestions = useCallback((text) => {
     if (!text.trim()) {
@@ -70,14 +77,12 @@ export default function OnboardingPage() {
   };
 
   const handleConfirm = () => {
-    const trip = {
+    addTrip({
       destination: destination.name,
       placeId: destination.placeId,
       startDate: range.from.toISOString(),
       endDate: range.to.toISOString(),
-    };
-    localStorage.setItem("currentTrip", JSON.stringify(trip));
-    localStorage.setItem("onboardingComplete", "true");
+    });
     router.push("/home");
   };
 
@@ -90,6 +95,14 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-black relative">
       {/*Auth buttons */}
       <div className="absolute top-6 right-8 lg:right-20 z-20 flex items-center gap-4 text-sm font-medium">
+        {hasTrips && (
+          <button
+            onClick={() => router.push("/home")}
+            className="text-white/70 hover:text-white px-4 py-2.5 text-sm font-semibold tracking-wide transition-colors"
+          >
+            ← My trips
+          </button>
+        )}
         <button
           onClick={() => handleAuth("login")}
           className="bg-white/10 hover:bg-white/20 active:scale-95 text-white border border-white/10 px-6 py-2.5 rounded-full text-sm font-semibold tracking-wide transition-all backdrop-blur-sm"

@@ -1,14 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { clearTrip, isLoggedIn } from "@/lib/storage";
+import { clearTrips, isLoggedIn } from "@/lib/storage";
 
 export default function Navbar() {
   const router = useRouter();
   const loggedIn = isLoggedIn();
 
   const handleNewTrip = () => {
-    clearTrip();
     router.push("/onboarding");
   };
 
@@ -21,7 +20,7 @@ export default function Navbar() {
   };
 
   const handleLogoutClick = () => {
-    clearTrip();
+    clearTrips();
     router.push("/");
   };
 
