@@ -401,9 +401,9 @@ export default function DayPlanner({
         <div className="space-y-1">
           {issueCount > 0 && (
             <p className="text-xs text-[#FFC48A]">
-              {issueCount} stop{issueCount === 1 ? " needs" : "s need"} a look:
-              closed, or the timing doesn&apos;t fit. Details are under each
-              stop.
+              {issueCount === 1
+                ? "1 stop has a timing problem (closed, or not open when you'd arrive). See the orange note under it."
+                : `${issueCount} stops have timing problems (closed, or not open when you'd arrive). See the orange notes under them.`}
             </p>
           )}
           {anyFar && (
