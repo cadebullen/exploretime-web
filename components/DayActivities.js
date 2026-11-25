@@ -379,7 +379,7 @@ function PlaceCard({ place, date, isSaved, otherDays = [], onToggle }) {
                 : "bg-[#FF9F43] text-[#1A1006] hover:brightness-110"
             }`}
           >
-            {isSaved ? "Added ✓" : "Add to day"}
+            {isSaved ? "Added ✓" : "Add"}
           </button>
           <a
             href={place.mapsUrl}

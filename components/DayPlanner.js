@@ -385,16 +385,7 @@ export default function DayPlanner({
             </button>
           ))}
 
-        {isDesktop ? (
-          <button
-            type="button"
-            onClick={toggleMap}
-            aria-expanded={mapVisible}
-            className={`ml-auto ${btn(mapVisible)}`}
-          >
-            {mapVisible ? "Hide map" : "Show map"}
-          </button>
-        ) : (
+        {!isDesktop && (
           <button
             type="button"
             onClick={() => setMapOpen(true)}
@@ -448,9 +439,22 @@ export default function DayPlanner({
 
       <div className="max-w-xl">{addSection}</div>
 
-      {isDesktop
-        ? mapVisible && <div className="h-[30rem] 2xl:h-[36rem]">{map}</div>
-        : mapOpen && (
+      {isDesktop && (
+        <div className="space-y-2">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={toggleMap}
+              aria-expanded={mapVisible}
+              className={btn(mapVisible)}
+            >
+              {mapVisible ? "Hide map" : "Show map"}
+            </button>
+          </div>
+          {mapVisible && <div className="h-[30rem] 2xl:h-[36rem]">{map}</div>}
+        </div>
+      )}
+      {!isDesktop && mapOpen && (
             <div
               className="fixed inset-0 z-[60] flex flex-col bg-black"
               role="dialog"
