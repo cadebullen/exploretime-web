@@ -255,10 +255,10 @@ const PER_LIST = 6;
 
 // Each day of the trip shows a different window of the ranked list: day 1
 // gets the top 6, day 2 the next 6, and so on, wrapping around when the list
-// runs out.
-function placesForDay(ranked, dayIndex) {
+// runs out. Each refresh moves the window on by another 6.
+function placesForDay(ranked, dayIndex, refreshes = 0) {
   if (ranked.length <= PER_LIST) return ranked;
-  const start = (dayIndex * PER_LIST) % ranked.length;
+  const start = ((dayIndex + refreshes) * PER_LIST) % ranked.length;
   return Array.from(
     { length: PER_LIST },
     (_, k) => ranked[(start + k) % ranked.length],
@@ -364,6 +364,8 @@ export default function DayActivities({
     : normalizeProfile(profile ?? draft);
 
   const [timeOfDay, setTimeOfDay] = useState("Morning");
+  // How many times each list was refreshed.
+  const [refreshes, setRefreshes] = useState({ activity: 0, food: 0 });
 
   // Suggestions for the chosen time of day, as two lists.
   const lists = useMemo(() => {
@@ -372,17 +374,18 @@ export default function DayActivities({
       .map((place) => ({ place, score: scorePlace(place, selectedProfile) }))
       .sort((a, b) => b.score - a.score)
       .map((item) => item.place);
-    return {
-      activity: placesForDay(
-        ranked.filter((p) => placeKind(p) === "activity"),
-        dayIndex,
-      ),
-      food: placesForDay(
-        ranked.filter((p) => placeKind(p) === "food"),
-        dayIndex,
-      ),
+    const forKind = (kind) => {
+      const all = ranked.filter((p) => placeKind(p) === kind);
+      return {
+        shown: placesForDay(all, dayIndex, refreshes[kind]),
+        canRefresh: all.length > PER_LIST,
+      };
     };
-  }, [places, selectedProfile, timeOfDay, dayIndex]);
+    return { activity: forKind("activity"), food: forKind("food") };
+  }, [places, selectedProfile, timeOfDay, dayIndex, refreshes]);
+
+  const refreshList = (kind) =>
+    setRefreshes((r) => ({ ...r, [kind]: r[kind] + 1 }));
 
   const savedIds = new Set(saved.map((p) => p.id));
 
@@ -728,13 +731,25 @@ export default function DayActivities({
                 { kind: "food", title: "Food" },
               ].map(({ kind, title }) => (
                 <div key={kind}>
-                  <h3 className="text-base font-semibold text-white mb-3">
-                    {title}
-                    <span className="ml-2 text-sm font-normal text-white/45">
-                      {timeOfDay.toLowerCase()}
-                    </span>
-                  </h3>
-                  {lists[kind].length === 0 ? (
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <h3 className="text-base font-semibold text-white">
+                      {title}
+                      <span className="ml-2 text-sm font-normal text-white/45">
+                        {timeOfDay.toLowerCase()}
+                      </span>
+                    </h3>
+                    {lists[kind].canRefresh && (
+                      <button
+                        type="button"
+                        onClick={() => refreshList(kind)}
+                        className="flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-sm text-white/70 hover:text-white hover:border-white/30 transition-colors"
+                      >
+                        <span aria-hidden="true">↻</span>
+                        Show other {kind === "food" ? "food spots" : "activities"}
+                      </button>
+                    )}
+                  </div>
+                  {lists[kind].shown.length === 0 ? (
                     <p className="text-sm text-white/50">
                       {kind === "food"
                         ? `No ${timeOfDay.toLowerCase()} food spots found here.`
@@ -742,7 +757,7 @@ export default function DayActivities({
                     </p>
                   ) : (
                     <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {lists[kind].map((place) => (
+                      {lists[kind].shown.map((place) => (
                         <PlaceCard
                           key={place.id}
                           place={place}
