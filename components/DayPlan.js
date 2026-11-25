@@ -8,6 +8,7 @@ import {
   dropPlace,
   canMove,
 } from "@/lib/planOrder";
+import { TIME_RANGE_LABELS } from "@/lib/openingHours";
 
 // The places planned for one day, grouped by time of day. Reorder by dragging
 // (also between times of day) or with the up/down buttons.
@@ -63,6 +64,9 @@ export default function DayPlan({ plan, onChange, onRemove }) {
           >
             <h3 className="text-sm font-semibold text-white/60 mb-2">
               {block}
+              <span className="ml-2 font-normal text-white/35">
+                {TIME_RANGE_LABELS[block]}
+              </span>
             </h3>
             <ul
               className={`space-y-2 rounded-xl transition-colors ${

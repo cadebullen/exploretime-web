@@ -2,7 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { placeKind, priceLabel } from "@/lib/placeCategories";
-import { hoursLabel, openTimesOfDay } from "@/lib/openingHours";
+import {
+  hoursLabel,
+  openTimesOfDay,
+  TIME_RANGE_LABELS,
+} from "@/lib/openingHours";
 import DayPlan from "@/components/DayPlan";
 
 const TOTAL_STEPS = 4;
@@ -710,7 +714,7 @@ export default function DayActivities({
                 >
                   {BLOCKS.map((b) => (
                     <option key={b} value={b}>
-                      {b}
+                      {b} ({TIME_RANGE_LABELS[b]})
                     </option>
                   ))}
                 </select>
@@ -743,7 +747,7 @@ export default function DayActivities({
                     <h3 className="text-base font-semibold text-white">
                       {title}
                       <span className="ml-2 text-sm font-normal text-white/45">
-                        {timeOfDay.toLowerCase()}
+                        {TIME_RANGE_LABELS[timeOfDay]}
                       </span>
                     </h3>
                     {lists[kind].canRefresh && (
