@@ -243,7 +243,7 @@ export default function HomePage() {
                           setFromSearch(fromCur);
                         }, 150)
                       }
-                      className="w-full bg-white/10 border border-white/15 rounded-lg px-2 py-1.5 text-xs text-white placeholder-white/40 outline-none focus:border-[#4F6DF5] transition-colors"
+                      className="w-full bg-white/10 border border-white/15 rounded-lg px-2 py-1.5 text-xs text-white placeholder-white/40 outline-none focus:border-[#FF9F43] transition-colors"
                     />
                     {showFromDrop && (
                       <ul className="absolute z-50 top-full mt-1 left-0 right-0 bg-zinc-900 border border-white/15 rounded-lg max-h-44 overflow-y-auto shadow-xl">
@@ -292,7 +292,7 @@ export default function HomePage() {
                           setToSearch(toCur ?? "");
                         }, 150)
                       }
-                      className="w-full bg-white/10 border border-white/15 rounded-lg px-2 py-1.5 text-xs text-white placeholder-white/40 outline-none focus:border-[#4F6DF5] transition-colors"
+                      className="w-full bg-white/10 border border-white/15 rounded-lg px-2 py-1.5 text-xs text-white placeholder-white/40 outline-none focus:border-[#FF9F43] transition-colors"
                     />
                     {showToDrop && (
                       <ul className="absolute z-50 top-full mt-1 left-0 right-0 bg-zinc-900 border border-white/15 rounded-lg max-h-44 overflow-y-auto shadow-xl">
@@ -326,7 +326,7 @@ export default function HomePage() {
                   min="0"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="w-full bg-white/10 border border-white/15 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#4F6DF5] transition-colors mb-3"
+                  className="w-full bg-white/10 border border-white/15 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#FF9F43] transition-colors mb-3"
                   placeholder="Amount"
                 />
 

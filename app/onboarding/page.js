@@ -6,7 +6,11 @@ import "react-day-picker/dist/style.css";
 import { useRouter } from "next/navigation";
 import { addTrip, getTrips, setActiveTrip } from "@/lib/storage";
 
-import { ACCENT, formatDate as formatShortDate } from "@/lib/utils";
+import {
+  ACCENT,
+  ACCENT_INK,
+  formatDate as formatShortDate,
+} from "@/lib/utils";
 
 const BACKGROUND_IMAGE = "/onboarding_bg.jpg";
 
@@ -39,6 +43,15 @@ export default function OnboardingPage() {
     setTrips(getTrips());
   }, []);
   const hasTrips = trips.length > 0;
+
+  const handleRangeSelect = (selected, day) => {
+    // With a full range picked, the next click starts a new range.
+    if (day && range.from && range.to) {
+      setRange({ from: day, to: undefined });
+      return;
+    }
+    setRange(selected ?? { from: undefined, to: undefined });
+  };
 
   const fetchSuggestions = useCallback((text) => {
     if (!text.trim()) {
@@ -140,10 +153,10 @@ export default function OnboardingPage() {
                 <div
                   className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
                   style={{
-                    backgroundColor: step === i ? "#4F6DF5" : "transparent",
+                    backgroundColor: step === i ? ACCENT : "transparent",
                     border:
                       step === i ? "none" : "1px solid rgba(255,255,255,0.3)",
-                    color: "#fff",
+                    color: step === i ? ACCENT_INK : "#fff",
                   }}
                 >
                   {step > i ? "✓" : i + 1}
@@ -226,7 +239,7 @@ export default function OnboardingPage() {
             {/* ── Step 0: Destination ── */}
             {step === 0 && (
               <div className="bg-white/[0.06] backdrop-blur-xl border border-white/15 p-8 sm:p-10 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] w-full">
-                <p className="text-[#B4C0FF] text-sm font-medium mb-2 drop-shadow-sm">
+                <p className="text-[#FFC48A] text-sm font-medium mb-2 drop-shadow-sm">
                   Step 1 of 2
                 </p>
                 <h1 className="text-4xl font-bold text-white mb-7 tracking-tight drop-shadow">
@@ -234,7 +247,7 @@ export default function OnboardingPage() {
                 </h1>
 
                 <div className="relative">
-                  <div className="flex items-center border border-white/10 rounded-xl px-4 py-3.5 bg-white/5 focus-within:border-[#4F6DF5] focus-within:bg-white/10 transition-all shadow-inner">
+                  <div className="flex items-center border border-white/10 rounded-xl px-4 py-3.5 bg-white/5 focus-within:border-[#FF9F43] focus-within:bg-white/10 transition-all shadow-inner">
                     {/* SVG Icon */}
                     <svg
                       className="w-4 h-4 text-white/50 mr-3 shrink-0"
@@ -293,7 +306,7 @@ export default function OnboardingPage() {
                   disabled={!destination}
                   className={`mt-7 w-full py-3.5 rounded-xl text-sm font-semibold transition-all ${
                     destination
-                      ? "bg-gradient-to-r from-[#4F6DF5] to-[#7C3AED] text-white shadow-lg hover:brightness-110 active:scale-[0.99]"
+                      ? "bg-[#FF9F43] text-[#1A1006] shadow-lg hover:brightness-110 active:scale-[0.99]"
                       : "bg-white/10 text-white/40 cursor-not-allowed"
                   }`}
                 >
@@ -324,7 +337,7 @@ export default function OnboardingPage() {
                   </svg>
                   Back
                 </button>
-                <p className="text-[#B4C0FF] text-sm font-medium mb-2 drop-shadow-sm">
+                <p className="text-[#FFC48A] text-sm font-medium mb-2 drop-shadow-sm">
                   Step 2 of 2
                 </p>
 
@@ -333,7 +346,7 @@ export default function OnboardingPage() {
                 </h1>
                 <p
                   className="text-sm font-medium mb-6"
-                  style={{ color: destination ? "#B4C0FF" : "transparent" }}
+                  style={{ color: destination ? "#FFC48A" : "transparent" }}
                 >
                   ✈️ {destination?.name}
                 </p>
@@ -351,29 +364,14 @@ export default function OnboardingPage() {
                       : `${formatDate(range.from)}  →  ${formatDate(range.to)}`}
                 </div>
 
-                {/* Inner glass wrapper specifically for the calendar base */}
-                <div className="flex justify-center bg-black/20 p-4 rounded-xl border border-white/5 backdrop-blur-sm">
+                <div className="flex justify-center bg-black/30 p-4 rounded-2xl border border-white/10 backdrop-blur-sm">
                   <DayPicker
                     mode="range"
                     selected={range}
-                    onSelect={setRange}
+                    onSelect={handleRangeSelect}
                     disabled={{ before: today }}
                     showOutsideDays
-                    style={{ color: "#fff" }}
-                    modifiersStyles={{
-                      selected: {
-                        backgroundColor: ACCENT,
-                        color: "#fff",
-                        fontWeight: 600,
-                      },
-                      range_middle: {
-                        backgroundColor: ACCENT + "40",
-                        color: "#fff",
-                      },
-                      today: { color: "#B4C0FF", fontWeight: 700 },
-                      outside: { color: "rgba(255,255,255,0.2)" },
-                      disabled: { color: "rgba(255,255,255,0.1)" },
-                    }}
+                    className="et-calendar"
                   />
                 </div>
 
@@ -382,7 +380,7 @@ export default function OnboardingPage() {
                   disabled={!datesReady}
                   className={`mt-7 w-full py-3.5 rounded-xl text-sm font-semibold transition-all ${
                     datesReady
-                      ? "bg-gradient-to-r from-[#4F6DF5] to-[#7C3AED] text-white shadow-lg hover:brightness-110 active:scale-[0.99]"
+                      ? "bg-[#FF9F43] text-[#1A1006] shadow-lg hover:brightness-110 active:scale-[0.99]"
                       : "bg-white/10 text-white/40 cursor-not-allowed"
                   }`}
                 >

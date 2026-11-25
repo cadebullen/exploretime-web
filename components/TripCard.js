@@ -11,7 +11,7 @@ export default function TripCard({ trip, dayCount, onEdit, onDelete }) {
     <div
       className="rounded-3xl p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6"
       style={{
-        background: "linear-gradient(135deg, #4F6DF5 0%, #7C3AED 100%)",
+        background: "linear-gradient(135deg, #F7A04B 0%, #D9480F 100%)",
       }}
     >
       <div>

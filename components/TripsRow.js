@@ -26,7 +26,7 @@ export default function TripsRow({ trips, activeId, onSelect, onAdd }) {
               aria-pressed={active}
               className={`snap-start shrink-0 w-56 text-left rounded-2xl p-4 border transition-colors ${
                 active
-                  ? "border-[#4F6DF5] bg-[#4F6DF5]/15"
+                  ? "border-[#FF9F43] bg-[#FF9F43]/15"
                   : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20"
               }`}
             >
@@ -41,7 +41,7 @@ export default function TripsRow({ trips, activeId, onSelect, onAdd }) {
               </p>
               <p
                 className={`text-[11px] font-semibold uppercase tracking-wider mt-1 ${
-                  active ? "text-[#8EA2FF]" : "text-white/35"
+                  active ? "text-[#FFC48A]" : "text-white/35"
                 }`}
               >
                 {statusLabel(trip)}

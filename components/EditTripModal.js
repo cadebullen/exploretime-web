@@ -5,7 +5,7 @@ import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { updateTrip } from "@/lib/storage";
 
-const ACCENT = "#4F6DF5";
+import { ACCENT, ACCENT_INK } from "@/lib/utils";
 
 function fmt(date) {
   if (!date) return "";
@@ -137,7 +137,7 @@ export default function EditTripModal({ trip, onClose, onSave }) {
               value={query}
               onChange={handleQueryChange}
               placeholder="Search city…"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-[#4F6DF5] transition-colors"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-[#FF9F43] transition-colors"
             />
             {searching && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
@@ -185,7 +185,7 @@ export default function EditTripModal({ trip, onClose, onSave }) {
             selected={range}
             onSelect={handleRangeSelect}
             disabled={{ before: new Date() }}
-            className="trip-edit-calendar font-sans"
+            className="et-calendar et-calendar--boxed font-sans"
           />
         </div>
 
@@ -200,8 +200,12 @@ export default function EditTripModal({ trip, onClose, onSave }) {
           <button
             onClick={handleSave}
             disabled={!canSave}
-            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity"
-            style={{ backgroundColor: ACCENT, opacity: canSave ? 1 : 0.35 }}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-opacity"
+            style={{
+              backgroundColor: ACCENT,
+              color: ACCENT_INK,
+              opacity: canSave ? 1 : 0.35,
+            }}
           >
             Save Trip
           </button>

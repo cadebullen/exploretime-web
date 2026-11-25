@@ -384,7 +384,7 @@ export default function DayActivities({
                   style={{
                     width: step === i ? "24px" : "6px",
                     backgroundColor:
-                      step === i ? "#4F6DF5" : "rgba(255,255,255,0.2)",
+                      step === i ? "#FF9F43" : "rgba(255,255,255,0.2)",
                   }}
                 />
               ))}
@@ -410,7 +410,7 @@ export default function DayActivities({
                     onClick={() => setDraft((p) => ({ ...p, vibe: value }))}
                     className={`px-3 py-2.5 rounded-lg text-left border transition-colors ${
                       draft.vibe === value
-                        ? "bg-[#4F6DF5] border-[#4F6DF5] text-white"
+                        ? "bg-[#FF9F43] border-[#FF9F43] text-[#1A1006]"
                         : "border-white/20 text-white/70 hover:text-white"
                     }`}
                   >
@@ -432,7 +432,7 @@ export default function DayActivities({
                     onClick={() => setDraft((p) => ({ ...p, budget: value }))}
                     className={`px-3 py-2.5 rounded-lg text-left border transition-colors ${
                       draft.budget === value
-                        ? "bg-[#4F6DF5] border-[#4F6DF5] text-white"
+                        ? "bg-[#FF9F43] border-[#FF9F43] text-[#1A1006]"
                         : "border-white/20 text-white/70 hover:text-white"
                     }`}
                   >
@@ -454,7 +454,7 @@ export default function DayActivities({
                     onClick={() => setDraft((p) => ({ ...p, social: value }))}
                     className={`px-3 py-2.5 rounded-lg text-left border transition-colors ${
                       draft.social === value
-                        ? "bg-[#4F6DF5] border-[#4F6DF5] text-white"
+                        ? "bg-[#FF9F43] border-[#FF9F43] text-[#1A1006]"
                         : "border-white/20 text-white/70 hover:text-white"
                     }`}
                   >
@@ -482,7 +482,7 @@ export default function DayActivities({
                         onClick={() => toggleInterest(interest.id)}
                         className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
                           active
-                            ? "bg-[#4F6DF5] border-[#4F6DF5] text-white"
+                            ? "bg-[#FF9F43] border-[#FF9F43] text-[#1A1006]"
                             : "border-white/20 text-white/70 hover:text-white"
                         }`}
                       >
@@ -513,9 +513,9 @@ export default function DayActivities({
                 type="button"
                 onClick={() => setStep((s) => Math.min(TOTAL_STEPS - 1, s + 1))}
                 disabled={!canContinue}
-                className="px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity"
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-[#1A1006] transition-opacity"
                 style={{
-                  backgroundColor: "#4F6DF5",
+                  backgroundColor: "#FF9F43",
                   opacity: canContinue ? 1 : 0.35,
                 }}
               >
@@ -526,9 +526,9 @@ export default function DayActivities({
                 type="button"
                 onClick={completePreferences}
                 disabled={!canContinue}
-                className="px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity"
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-[#1A1006] transition-opacity"
                 style={{
-                  backgroundColor: "#4F6DF5",
+                  backgroundColor: "#FF9F43",
                   opacity: canContinue ? 1 : 0.35,
                 }}
               >

@@ -17,88 +17,82 @@ body {
   color: #ffffff;
 }
 
-/* react-day-picker dark override */
-.rdp {
-  --rdp-background-color: transparent;
-  --rdp-accent-color: #4F6DF5;
-  color: #ffffff;
-}
-.rdp-day:hover:not(.rdp-day_selected) {
-  background-color: rgba(255,255,255,0.1) !important;
-}
-
-/* Global selected/range colors (DayPicker v8 + v9 selectors) */
-.rdp .rdp-day_selected,
-.rdp .rdp-day_range_start,
-.rdp .rdp-day_range_end,
-.rdp .rdp-selected,
-.rdp .rdp-range_start,
-.rdp .rdp-range_end {
-  background: #22C55E !important;
-  color: #04140a !important;
-}
-
-.rdp .rdp-day_range_middle,
-.rdp .rdp-range_middle {
-  background: rgba(34, 197, 94, 0.35) !important;
-  color: #ffffff !important;
-}
-
-/* Edit trip modal calendar contrast and readability */
-.trip-edit-calendar {
-  --rdp-accent-color: #4F6DF5;
-  --rdp-day-height: 38px;
-  --rdp-day-width: 38px;
+/* Date picker (react-day-picker v9+) — shared dark theme with orange accent.
+   Used by trip setup and the edit-trip modal via className="et-calendar". */
+.et-calendar {
+  --rdp-accent-color: #ff9f43;
+  --rdp-accent-background-color: rgba(255, 159, 67, 0.22);
+  --rdp-day-height: 40px;
+  --rdp-day-width: 40px;
+  --rdp-day_button-height: 38px;
+  --rdp-day_button-width: 38px;
+  --rdp-selected-border: 2px solid transparent;
+  --rdp-range_start-color: #1a1006;
+  --rdp-range_end-color: #1a1006;
+  --rdp-range_middle-color: #fff;
+  --rdp-today-color: #ffc48a;
+  --rdp-outside-opacity: 0.35;
+  --rdp-disabled-opacity: 0.22;
+  --rdp-weekday-opacity: 1;
   color: #fff;
+}
+
+.et-calendar--boxed {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
   padding: 12px;
 }
 
-.trip-edit-calendar .rdp-caption_label {
+.et-calendar .rdp-caption_label {
   color: #fff;
   font-weight: 600;
 }
 
-.trip-edit-calendar .rdp-weekday {
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 11px;
+.et-calendar .rdp-weekday {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  font-weight: 500;
 }
 
-.trip-edit-calendar .rdp-nav_button {
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.05);
+.et-calendar .rdp-chevron {
+  fill: #fff;
 }
 
-.trip-edit-calendar .rdp-day {
-  color: rgba(255, 255, 255, 0.9);
-  border-radius: 8px;
+.et-calendar .rdp-button_previous:hover:not(:disabled),
+.et-calendar .rdp-button_next:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
 }
 
-.trip-edit-calendar .rdp-day:hover:not(.rdp-day_selected):not(.rdp-day_range_middle) {
-  background: rgba(255, 255, 255, 0.12) !important;
+.et-calendar .rdp-day_button {
+  font-size: 14px;
+  transition: background-color 0.12s;
 }
 
-.trip-edit-calendar .rdp-day_selected,
-.trip-edit-calendar .rdp-day_range_start,
-.trip-edit-calendar .rdp-day_range_end,
-.trip-edit-calendar .rdp-selected,
-.trip-edit-calendar .rdp-range_start,
-.trip-edit-calendar .rdp-range_end {
-  background: #4F6DF5 !important;
-  color: #fff !important;
+.et-calendar .rdp-day:not(.rdp-disabled):not(.rdp-selected) .rdp-day_button:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 
-.trip-edit-calendar .rdp-day_range_middle,
-.trip-edit-calendar .rdp-range_middle {
-  background: rgba(79, 109, 245, 0.25) !important;
-  color: #fff !important;
+/* Today: ringed so it stands out without looking selected */
+.et-calendar .rdp-today:not(.rdp-selected) .rdp-day_button {
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 196, 138, 0.7);
 }
 
-.trip-edit-calendar .rdp-day_disabled {
-  color: rgba(255, 255, 255, 0.22) !important;
+/* A single picked day (before the end date is chosen) */
+.et-calendar .rdp-selected:not(.rdp-range_middle) .rdp-day_button {
+  background: #ff9f43;
+  color: #1a1006;
+  font-weight: 700;
+}
+
+.et-calendar .rdp-selected {
+  font-size: inherit;
+}
+
+.et-calendar .rdp-range_middle .rdp-day_button {
+  font-weight: 500;
 }
 
 body {
