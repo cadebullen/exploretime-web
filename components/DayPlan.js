@@ -30,7 +30,7 @@ export default function DayPlan({
   const ordered = orderPlan(plan);
   const numberOf = (id) => ordered.findIndex((p) => p.id === id) + 1;
 
-  if (ordered.length === 0) return null;
+
 
   const endDrag = () => {
     setDraggingId(null);
@@ -44,12 +44,13 @@ export default function DayPlan({
 
   // While dragging, every time of day is shown so places can be dropped into
   // an empty one.
-  const blocks = BLOCKS.filter(
-    (b) => draggingId || ordered.some((p) => p.timeBlock === b),
-  );
+  const blocks = BLOCKS;
+
+  const iconButton =
+    "w-7 h-7 rounded-md text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:hover:bg-transparent";
 
   return (
-    <div className="space-y-4">
+    <div className="grid gap-4 lg:grid-cols-3">
       {blocks.map((block) => {
         const items = ordered.filter((p) => p.timeBlock === block);
         const blockKey = `block:${block}`;
@@ -67,20 +68,25 @@ export default function DayPlan({
               e.preventDefault();
               handleDrop(block, null);
             }}
+            className={`flex flex-col rounded-2xl border p-3 transition-colors ${
+              dropTarget === blockKey
+                ? "border-[#FF9F43]/60 bg-[#FF9F43]/10"
+                : "border-white/10 bg-white/[0.02]"
+            }`}
           >
-            <h3 className="text-sm font-semibold text-white/60 mb-2">
+            <h3 className="text-sm font-semibold text-white/80 mb-3 px-1">
               {block}
-              <span className="ml-2 font-normal text-white/35">
+              <span className="ml-2 font-normal text-white/40">
                 {TIME_RANGE_LABELS[block]}
               </span>
             </h3>
-            <ul
-              className={`space-y-2 rounded-xl transition-colors ${
-                dropTarget === blockKey ? "bg-[#FF9F43]/10 outline outline-1 outline-[#FF9F43]/40" : ""
-              } ${items.length === 0 ? "min-h-12 border border-dashed border-white/15 flex items-center justify-center" : ""}`}
-            >
+            <ul className="space-y-2 flex-1">
               {items.length === 0 && (
-                <li className="text-xs text-white/40">Drop here</li>
+                <li className="flex min-h-20 items-center justify-center rounded-xl border border-dashed border-white/15 px-3 text-center text-xs text-white/40">
+                  {draggingId
+                    ? "Drop here"
+                    : `Nothing planned for the ${block.toLowerCase()}`}
+                </li>
               )}
               {items.map((p) => (
                 <li
@@ -103,7 +109,7 @@ export default function DayPlan({
                     e.stopPropagation();
                     handleDrop(block, p.id);
                   }}
-                  className={`flex items-center gap-3 rounded-xl border bg-white/[0.03] px-3 py-3 transition-colors ${
+                  className={`rounded-xl border bg-black/40 px-3 py-2.5 transition-colors ${
                     draggingId === p.id
                       ? "opacity-40 border-white/10"
                       : dropTarget === p.id
@@ -113,94 +119,39 @@ export default function DayPlan({
                           : "border-white/10"
                   }`}
                 >
-                  <span
-                    className="cursor-grab active:cursor-grabbing select-none text-white/35 hover:text-white/70 px-1"
-                    title="Drag to reorder"
-                    aria-hidden="true"
-                  >
-                    ⋮⋮
-                  </span>
-                  <span
-                    className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-xs font-bold ${
-                      selectedId === p.id
-                        ? "bg-white text-[#1A1006]"
-                        : "bg-[#FF9F43] text-[#1A1006]"
-                    }`}
-                  >
-                    {numberOf(p.id)}
-                  </span>
-                  <div className="flex-1 min-w-0">
+                  {/* Name row */}
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="cursor-grab active:cursor-grabbing select-none text-white/30 hover:text-white/70"
+                      title="Drag to reorder"
+                      aria-hidden="true"
+                    >
+                      ⋮⋮
+                    </span>
+                    <span
+                      className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-xs font-bold ${
+                        selectedId === p.id
+                          ? "bg-white text-[#1A1006]"
+                          : "bg-[#FF9F43] text-[#1A1006]"
+                      }`}
+                    >
+                      {numberOf(p.id)}
+                    </span>
                     <button
                       type="button"
                       onClick={() => onSelect(selectedId === p.id ? null : p.id)}
-                      className="block max-w-full text-left text-sm font-medium text-white truncate hover:underline underline-offset-2"
-                      title="Show on map"
+                      className="flex-1 min-w-0 text-left text-sm font-medium text-white truncate hover:underline underline-offset-2"
+                      title={`${p.name} (show on map)`}
                     >
                       {p.name}
                     </button>
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/55 mt-0.5">
-                      {times[p.id] && (
-                        <span className={times[p.id].overruns ? "text-[#FFC48A]" : ""}>
-                          ~{formatClock(times[p.id].arrive)} – {formatClock(times[p.id].leave)}
-                        </span>
-                      )}
-                      <select
-                        value={visitMinutes(p)}
-                        onChange={(e) => onDurationChange(p.id, Number(e.target.value))}
-                        aria-label={`Time to spend at ${p.name}`}
-                        className="rounded border border-white/10 bg-zinc-900 px-1 py-0.5 text-xs text-white/70 outline-none focus:border-[#FF9F43]"
-                      >
-                        {[...new Set([...DURATION_OPTIONS, visitMinutes(p)])]
-                          .sort((a, b) => a - b)
-                          .map((m) => (
-                            <option key={m} value={m}>
-                              {formatDuration(m)}
-                            </option>
-                          ))}
-                      </select>
-                      {p.category === "Food" && p.reservable && (
-                        <span className="text-white/60">Takes reservations</span>
-                      )}
-                      {p.website && (
-                        <a
-                          href={p.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-white/60 underline underline-offset-2 hover:text-white"
-                        >
-                          {p.category === "Food" && p.reservable ? "Book / website" : "Website"}
-                        </a>
-                      )}
-                      {p.category === "Food" && p.phoneIntl && (
-                        <a
-                          href={`tel:${p.phoneIntl.replace(/\s+/g, "")}`}
-                          className="text-white/60 underline underline-offset-2 hover:text-white"
-                        >
-                          Call
-                        </a>
-                      )}
-                    </div>
-                    {issues[p.id] && (
-                      <p className="text-xs text-[#FFC48A] mt-0.5">{issues[p.id]}</p>
-                    )}
-                    <p
-                      className={`text-xs truncate mt-0.5 ${
-                        legsByFromId[p.id]?.far ? "text-[#FFC48A]" : "text-white/40"
-                      }`}
-                    >
-                      {legsByFromId[p.id]
-                        ? `Next stop: ${legsByFromId[p.id].label}${legsByFromId[p.id].far ? " (far)" : ""}`
-                        : `${p.category}${p.address ? ` · ${p.address}` : ""}`}
-                    </p>
-                  </div>
-                  <span className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => onChange(movePlace(ordered, p.id, -1))}
                       disabled={!canMove(ordered, p.id, -1)}
                       aria-label={`Move ${p.name} earlier`}
                       title="Move earlier"
-                      className="w-7 h-7 rounded-md text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:hover:bg-transparent"
+                      className={iconButton}
                     >
                       ↑
                     </button>
@@ -210,26 +161,89 @@ export default function DayPlan({
                       disabled={!canMove(ordered, p.id, 1)}
                       aria-label={`Move ${p.name} later`}
                       title="Move later"
-                      className="w-7 h-7 rounded-md text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-25 disabled:hover:bg-transparent"
+                      className={iconButton}
                     >
                       ↓
                     </button>
-                  </span>
-                  <a
-                    href={p.mapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-white/60 hover:text-white"
+                    <button
+                      type="button"
+                      onClick={() => onRemove(p)}
+                      aria-label={`Remove ${p.name}`}
+                      title="Remove"
+                      className={iconButton}
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Time, visit length, links */}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 pl-[3.25rem] text-xs text-white/55">
+                    {times[p.id] && (
+                      <span className={times[p.id].overruns ? "text-[#FFC48A]" : ""}>
+                        ~{formatClock(times[p.id].arrive)} – {formatClock(times[p.id].leave)}
+                      </span>
+                    )}
+                    <select
+                      value={visitMinutes(p)}
+                      onChange={(e) => onDurationChange(p.id, Number(e.target.value))}
+                      aria-label={`Time to spend at ${p.name}`}
+                      className="rounded border border-white/10 bg-zinc-900 px-1 py-0.5 text-xs text-white/70 outline-none focus:border-[#FF9F43]"
+                    >
+                      {[...new Set([...DURATION_OPTIONS, visitMinutes(p)])]
+                        .sort((a, b) => a - b)
+                        .map((m) => (
+                          <option key={m} value={m}>
+                            {formatDuration(m)}
+                          </option>
+                        ))}
+                    </select>
+                    {p.mapsUrl && (
+                      <a
+                        href={p.mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-white/60 underline underline-offset-2 hover:text-white"
+                      >
+                        Map
+                      </a>
+                    )}
+                    {p.website && (
+                      <a
+                        href={p.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-white/60 underline underline-offset-2 hover:text-white"
+                      >
+                        {p.category === "Food" && p.reservable ? "Book / website" : "Website"}
+                      </a>
+                    )}
+                    {p.category === "Food" && p.phoneIntl && (
+                      <a
+                        href={`tel:${p.phoneIntl.replace(/\s+/g, "")}`}
+                        className="text-white/60 underline underline-offset-2 hover:text-white"
+                      >
+                        Call
+                      </a>
+                    )}
+                    {p.category === "Food" && p.reservable && (
+                      <span className="text-white/60">Takes reservations</span>
+                    )}
+                  </div>
+
+                  {issues[p.id] && (
+                    <p className="mt-1 pl-[3.25rem] text-xs text-[#FFC48A]">
+                      {issues[p.id]}
+                    </p>
+                  )}
+                  <p
+                    className={`mt-1 pl-[3.25rem] text-xs truncate ${
+                      legsByFromId[p.id]?.far ? "text-[#FFC48A]" : "text-white/40"
+                    }`}
                   >
-                    Map
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => onRemove(p)}
-                    className="text-xs text-white/50 hover:text-white"
-                  >
-                    Remove
-                  </button>
+                    {legsByFromId[p.id]
+                      ? `Next stop: ${legsByFromId[p.id].label}${legsByFromId[p.id].far ? " (far)" : ""}`
+                      : p.address}
+                  </p>
                 </li>
               ))}
             </ul>

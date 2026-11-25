@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { canMove, movePlace } from "@/lib/planOrder";
 
 const MAPS_KEY = process.env.NEXT_PUBLIC_MAPS_KEY;
+// Advanced markers need a map ID. DEMO_MAP_ID works for development; for
+// production create a map ID in Google Cloud and set NEXT_PUBLIC_MAPS_MAP_ID.
+const MAP_ID = process.env.NEXT_PUBLIC_MAPS_MAP_ID || "DEMO_MAP_ID";
 const ACCENT = "#FF9F43";
 
 // Loads the Google Maps JavaScript API once per page.
@@ -15,7 +18,7 @@ function loadGoogleMaps() {
   mapsPromise = new Promise((resolve, reject) => {
     window.__exploreTimeMapsReady = () => resolve(window.google.maps);
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(MAPS_KEY)}&v=weekly&libraries=geometry&loading=async&callback=__exploreTimeMapsReady`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(MAPS_KEY)}&v=weekly&libraries=geometry,marker&loading=async&callback=__exploreTimeMapsReady`;
     script.async = true;
     script.onerror = () => {
       mapsPromise = null;
@@ -26,17 +29,26 @@ function loadGoogleMaps() {
   return mapsPromise;
 }
 
-// Muted dark map so the orange pins and route stand out.
-const DARK_STYLE = [
-  { elementType: "geometry", stylers: [{ color: "#1d1d1f" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#9a9a9f" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#1d1d1f" }] },
-  { featureType: "poi", stylers: [{ visibility: "off" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#2e2e32" }] },
-  { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-  { featureType: "transit", stylers: [{ visibility: "off" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0f1a24" }] },
-];
+// Round numbered pin for an advanced marker.
+function pinElement(text, { fill, ring = "#1A1006" }) {
+  const el = document.createElement("div");
+  el.textContent = text;
+  el.style.cssText = [
+    "width:28px",
+    "height:28px",
+    "border-radius:50%",
+    `background:${fill}`,
+    `border:2px solid ${ring}`,
+    "color:#1A1006",
+    "font:700 12px system-ui, sans-serif",
+    "display:flex",
+    "align-items:center",
+    "justify-content:center",
+    "box-shadow:0 1px 4px rgba(0,0,0,.5)",
+    "cursor:pointer",
+  ].join(";");
+  return el;
+}
 
 function formatDuration(sec) {
   const min = Math.round(sec / 60);
@@ -93,7 +105,8 @@ export default function DayMap({
         mapRef.current = new maps.Map(containerRef.current, {
           center: { lat: 0, lng: 0 },
           zoom: 2,
-          styles: DARK_STYLE,
+          mapId: MAP_ID,
+          colorScheme: maps.ColorScheme?.DARK ?? "DARK",
           disableDefaultUI: true,
           zoomControl: true,
           fullscreenControl: true,
@@ -114,45 +127,37 @@ export default function DayMap({
     const maps = window.google.maps;
     const map = mapRef.current;
 
-    markersRef.current.forEach((m) => m.setMap(null));
+    const { AdvancedMarkerElement } = maps.marker;
+
+    markersRef.current.forEach((m) => (m.map = null));
     markersRef.current = stops.map((place, i) => {
-      const marker = new maps.Marker({
+      const marker = new AdvancedMarkerElement({
         map,
         position: place.location,
         title: `${place.n}. ${place.name}`,
-        label: { text: String(place.n), color: "#1A1006", fontWeight: "700", fontSize: "12px" },
-        icon: {
-          path: maps.SymbolPath.CIRCLE,
-          scale: 13,
-          fillColor: place.id === selectedId ? "#FFFFFF" : ACCENT,
-          fillOpacity: 1,
-          strokeColor: "#1A1006",
-          strokeWeight: 2,
-        },
+        content: pinElement(String(place.n), {
+          fill: place.id === selectedId ? "#FFFFFF" : ACCENT,
+        }),
         zIndex: place.id === selectedId ? 1000 : i,
+        gmpClickable: true,
       });
       marker.addListener("click", () => onSelect(place.id));
       return marker;
     });
 
     // Starting point: a white "S" pin.
-    startMarkerRef.current?.setMap(null);
+    if (startMarkerRef.current) startMarkerRef.current.map = null;
     startMarkerRef.current = null;
     if (start?.location) {
-      startMarkerRef.current = new maps.Marker({
+      startMarkerRef.current = new AdvancedMarkerElement({
         map,
         position: start.location,
         title: `Start: ${start.name}`,
-        label: { text: "S", color: "#1A1006", fontWeight: "700", fontSize: "12px" },
-        icon: {
-          path: maps.SymbolPath.CIRCLE,
-          scale: 13,
-          fillColor: selectedId === "start" ? ACCENT : "#FFFFFF",
-          fillOpacity: 1,
-          strokeColor: "#1A1006",
-          strokeWeight: 2,
-        },
+        content: pinElement("S", {
+          fill: selectedId === "start" ? ACCENT : "#FFFFFF",
+        }),
         zIndex: 999,
+        gmpClickable: true,
       });
       startMarkerRef.current.addListener("click", () => onSelect("start"));
     }

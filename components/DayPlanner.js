@@ -44,6 +44,20 @@ export default function DayPlanner({
   const [pickingStart, setPickingStart] = useState(false);
   const isDesktop = useIsDesktop();
   const [mapOpen, setMapOpen] = useState(false);
+  // Desktop map below the plan can be hidden; the choice is remembered.
+  const [mapVisible, setMapVisible] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("dayMapVisible") === "false") setMapVisible(false);
+    } catch {}
+  }, []);
+  const toggleMap = () =>
+    setMapVisible((v) => {
+      try {
+        localStorage.setItem("dayMapVisible", String(!v));
+      } catch {}
+      return !v;
+    });
 
   // Full-screen map on phones: close with Escape, and stop the page behind
   // it from scrolling.
@@ -304,10 +318,18 @@ export default function DayPlanner({
     );
   }
 
+  const btn = (active) =>
+    `rounded-lg px-3 py-1.5 border text-sm transition-colors ${
+      active
+        ? "border-[#FF9F43] bg-[#FF9F43]/15 text-white"
+        : "border-white/15 text-white/60 hover:text-white"
+    }`;
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] xl:gap-8 lg:items-start">
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2 text-sm">
+    <div className="space-y-4">
+      {/* Controls */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 text-sm">
+        <div className="flex items-center gap-2">
           <span className="text-white/50">Travel by</span>
           {[
             ["WALK", "Walking"],
@@ -318,66 +340,14 @@ export default function DayPlanner({
               type="button"
               onClick={() => setMode(value)}
               aria-pressed={mode === value}
-              className={`rounded-lg px-3 py-1.5 border transition-colors ${
-                mode === value
-                  ? "border-[#FF9F43] bg-[#FF9F43]/15 text-white"
-                  : "border-white/15 text-white/60 hover:text-white"
-              }`}
+              className={btn(mode === value)}
             >
               {label}
             </button>
           ))}
-          {!isDesktop && (
-            <button
-              type="button"
-              onClick={() => setMapOpen(true)}
-              className="ml-auto rounded-lg px-3 py-1.5 bg-[#FF9F43] text-[#1A1006] font-semibold"
-            >
-              View map
-            </button>
-          )}
         </div>
-        {locatedCount >= 2 && (
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            {beforeShortest ? (
-              <>
-                <span className="text-white/70">
-                  Reordered for the shortest route.
-                </span>
-                <button
-                  type="button"
-                  onClick={undoShortest}
-                  className="text-white underline underline-offset-2 hover:no-underline"
-                >
-                  Undo
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={applyShortest}
-                disabled={alreadyShortest}
-                className="rounded-lg border border-white/15 px-3 py-1.5 text-white/80 hover:text-white hover:border-white/30 disabled:opacity-40 disabled:hover:text-white/80 disabled:hover:border-white/15"
-              >
-                {alreadyShortest ? "Already the shortest route" : "Reorder for shortest route"}
-              </button>
-            )}
-          </div>
-        )}
-        {anyFar && (
-          <p className="text-xs text-[#FFC48A]">
-            {mode === "WALK"
-              ? "Some stops are over 45 minutes apart on foot. Try Driving, reorder for the shortest route, or move far places to another day."
-              : "Some stops are over 45 minutes apart. Reorder for the shortest route, or move far places to another day."}
-          </p>
-        )}
-        {routeError && (
-          <p className="text-xs text-white/50">
-            Travel times unavailable ({routeError}). Check that the Routes API
-            is enabled for PLACES_KEY.
-          </p>
-        )}
-        <label className="flex items-center gap-2 text-sm text-white/60">
+
+        <label className="flex items-center gap-2 text-white/60">
           Day starts at
           <select
             value={dayStartMin}
@@ -391,61 +361,120 @@ export default function DayPlanner({
             ))}
           </select>
         </label>
-        {issueCount > 0 && (
-          <p className="text-xs text-[#FFC48A]">
-            {issueCount} stop{issueCount === 1 ? " needs" : "s need"} a look:
-            closed, or the timing doesn&apos;t fit. Details are under each
-            stop.
-          </p>
-        )}
-        {startSection}
-        {ordered.length === 0 && (
-          <p className="text-sm text-white/45">
-            Nothing planned yet. Add places from the suggestions below.
-          </p>
-        )}
-        <DayPlan
-          plan={ordered}
-          onChange={handleChange}
-          onRemove={onRemove}
-          selectedId={selectedId}
-          onSelect={handleSelect}
-          legsByFromId={legsByFromId}
-          times={times}
-          issues={issues}
-          onDurationChange={changeDuration}
-        />
-        {addSection}
-      </div>
-      {isDesktop ? (
-        <div className="h-[34rem] 2xl:h-[40rem]">{map}</div>
-      ) : (
-        mapOpen && (
-          <div
-            className="fixed inset-0 z-[60] flex flex-col bg-black"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Map of this day's plan"
-          >
-            <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-              <p className="text-sm font-semibold text-white">
-                {ordered.length} stop{ordered.length === 1 ? "" : "s"}
-                {start ? ` from ${start.name}` : ""}
-              </p>
+
+        {locatedCount >= 2 &&
+          (beforeShortest ? (
+            <span className="flex items-center gap-2">
+              <span className="text-white/70">Reordered for the shortest route.</span>
               <button
                 type="button"
-                onClick={() => setMapOpen(false)}
-                className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-white"
+                onClick={undoShortest}
+                className="text-white underline underline-offset-2 hover:no-underline"
               >
-                Close
+                Undo
               </button>
-            </div>
-            <div className="relative flex-1 [&>div]:absolute [&>div]:inset-0 [&>div]:rounded-none [&>div]:border-0">
-              {map}
-            </div>
-          </div>
-        )
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={applyShortest}
+              disabled={alreadyShortest}
+              className="rounded-lg border border-white/15 px-3 py-1.5 text-white/80 hover:text-white hover:border-white/30 disabled:opacity-40 disabled:hover:text-white/80 disabled:hover:border-white/15"
+            >
+              {alreadyShortest ? "Already the shortest route" : "Reorder for shortest route"}
+            </button>
+          ))}
+
+        {isDesktop ? (
+          <button
+            type="button"
+            onClick={toggleMap}
+            aria-expanded={mapVisible}
+            className={`ml-auto ${btn(mapVisible)}`}
+          >
+            {mapVisible ? "Hide map" : "Show map"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setMapOpen(true)}
+            className="ml-auto rounded-lg px-3 py-1.5 bg-[#FF9F43] text-[#1A1006] font-semibold"
+          >
+            View map
+          </button>
+        )}
+      </div>
+
+      {/* Notices */}
+      {(anyFar || routeError || issueCount > 0) && (
+        <div className="space-y-1">
+          {issueCount > 0 && (
+            <p className="text-xs text-[#FFC48A]">
+              {issueCount} stop{issueCount === 1 ? " needs" : "s need"} a look:
+              closed, or the timing doesn&apos;t fit. Details are under each
+              stop.
+            </p>
+          )}
+          {anyFar && (
+            <p className="text-xs text-[#FFC48A]">
+              {mode === "WALK"
+                ? "Some stops are over 45 minutes apart on foot. Try Driving, reorder for the shortest route, or move far places to another day."
+                : "Some stops are over 45 minutes apart. Reorder for the shortest route, or move far places to another day."}
+            </p>
+          )}
+          {routeError && (
+            <p className="text-xs text-white/50">
+              Travel times unavailable ({routeError}). Check that the Routes
+              API is enabled for PLACES_KEY.
+            </p>
+          )}
+        </div>
       )}
+
+      <div className="max-w-xl">{startSection}</div>
+
+      {/* Morning | Afternoon | Evening */}
+      <DayPlan
+        plan={ordered}
+        onChange={handleChange}
+        onRemove={onRemove}
+        selectedId={selectedId}
+        onSelect={handleSelect}
+        legsByFromId={legsByFromId}
+        times={times}
+        issues={issues}
+        onDurationChange={changeDuration}
+      />
+
+      <div className="max-w-xl">{addSection}</div>
+
+      {isDesktop
+        ? mapVisible && <div className="h-[30rem] 2xl:h-[36rem]">{map}</div>
+        : mapOpen && (
+            <div
+              className="fixed inset-0 z-[60] flex flex-col bg-black"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Map of this day's plan"
+            >
+              <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+                <p className="text-sm font-semibold text-white">
+                  {ordered.length} stop{ordered.length === 1 ? "" : "s"}
+                  {start ? ` from ${start.name}` : ""}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setMapOpen(false)}
+                  className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-white"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="relative flex-1 [&>div]:absolute [&>div]:inset-0 [&>div]:rounded-none [&>div]:border-0">
+                {map}
+              </div>
+            </div>
+          )}
     </div>
   );
 }
