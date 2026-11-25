@@ -13,6 +13,7 @@ import {
   getTrips,
   setActiveTrip,
   deleteTrip,
+  dayPath,
 } from "@/lib/storage";
 import Navbar from "@/components/Navbar";
 import TripCard from "@/components/TripCard";
@@ -211,7 +212,7 @@ export default function HomePage() {
                     <DayCard
                       key={i}
                       day={day}
-                      onClick={() => router.push(`/home/day/${i + 1}`)}
+                      onClick={() => router.push(dayPath(trip, i + 1))}
                     />
                   ))}
                 </div>
