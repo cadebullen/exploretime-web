@@ -191,7 +191,6 @@ export default function DayDetailsPage() {
           placesError={placesError}
           city={trip.destination.split(",")[0]}
           dayIndex={dayNumber - 1}
-          dayCount={days.length}
           saved={saved}
           plannedElsewhere={plannedElsewhere}
           onToggleSave={toggleSave}

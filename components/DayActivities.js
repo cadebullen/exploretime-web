@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { priceLabel } from "@/lib/placeCategories";
+import { placeKind, priceLabel } from "@/lib/placeCategories";
 
 const TOTAL_STEPS = 4;
 const BLOCKS = ["Morning", "Afternoon", "Evening"];
@@ -251,17 +251,18 @@ function scorePlace(place, profile) {
   return score;
 }
 
-const PER_BLOCK = 6;
+const PER_LIST = 6;
 
-// Splits each time block's ranked places across the trip's days, so each day
-// gets its own suggestions. With too few places to split, every day sees all.
-function placesForDay(ranked, dayIndex, dayCount) {
-  if (dayCount <= 1 || ranked.length < dayCount * 3) {
-    return ranked.slice(0, PER_BLOCK);
-  }
-  return ranked
-    .filter((_, i) => i % dayCount === dayIndex % dayCount)
-    .slice(0, PER_BLOCK);
+// Each day of the trip shows a different window of the ranked list: day 1
+// gets the top 6, day 2 the next 6, and so on, wrapping around when the list
+// runs out.
+function placesForDay(ranked, dayIndex) {
+  if (ranked.length <= PER_LIST) return ranked;
+  const start = (dayIndex * PER_LIST) % ranked.length;
+  return Array.from(
+    { length: PER_LIST },
+    (_, k) => ranked[(start + k) % ranked.length],
+  );
 }
 
 function PlaceCard({ place, isSaved, otherDays = [], onToggle }) {
@@ -339,7 +340,6 @@ export default function DayActivities({
   placesError = null,
   city = "",
   dayIndex = 0,
-  dayCount = 1,
   saved = [],
   plannedElsewhere = {},
   onToggleSave,
@@ -363,21 +363,26 @@ export default function DayActivities({
     ? draft
     : normalizeProfile(profile ?? draft);
 
-  const grouped = useMemo(() => {
-    const out = { Morning: [], Afternoon: [], Evening: [] };
-    const ranked = [...places]
+  const [timeOfDay, setTimeOfDay] = useState("Morning");
+
+  // Suggestions for the chosen time of day, as two lists.
+  const lists = useMemo(() => {
+    const ranked = places
+      .filter((p) => p.timeBlock === timeOfDay)
       .map((place) => ({ place, score: scorePlace(place, selectedProfile) }))
       .sort((a, b) => b.score - a.score)
       .map((item) => item.place);
-    for (const block of BLOCKS) {
-      out[block] = placesForDay(
-        ranked.filter((p) => p.timeBlock === block),
+    return {
+      activity: placesForDay(
+        ranked.filter((p) => placeKind(p) === "activity"),
         dayIndex,
-        dayCount,
-      );
-    }
-    return out;
-  }, [places, selectedProfile, dayIndex, dayCount]);
+      ),
+      food: placesForDay(
+        ranked.filter((p) => placeKind(p) === "food"),
+        dayIndex,
+      ),
+    };
+  }, [places, selectedProfile, timeOfDay, dayIndex]);
 
   const savedIds = new Set(saved.map((p) => p.id));
 
@@ -681,9 +686,25 @@ export default function DayActivities({
           </section>
 
           <section className="space-y-8">
-            <h2 className="text-lg font-semibold text-white">
-              Suggestions{city ? ` in ${city}` : ""}
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-white">
+                Suggestions{city ? ` in ${city}` : ""}
+              </h2>
+              <label className="flex items-center gap-2 text-sm text-white/60">
+                Time of day
+                <select
+                  value={timeOfDay}
+                  onChange={(e) => setTimeOfDay(e.target.value)}
+                  className="rounded-lg border border-white/15 bg-zinc-900 px-3 py-2 text-sm font-medium text-white outline-none focus:border-[#FF9F43]"
+                >
+                  {BLOCKS.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
 
             {placesLoading && (
               <div className="flex items-center gap-2 text-sm text-white/45">
@@ -702,35 +723,38 @@ export default function DayActivities({
 
             {!placesLoading &&
               !placesError &&
-              BLOCKS.every((b) => grouped[b].length === 0) && (
-                <p className="text-sm text-white/60">
-                  No places found for these interests. Try adding more
-                  interests with Change preferences.
-                </p>
-              )}
-
-            {!placesLoading &&
-              BLOCKS.map(
-                (block) =>
-                  grouped[block].length > 0 && (
-                    <div key={block}>
-                      <h3 className="text-sm font-semibold text-white/70 mb-3">
-                        {block}
-                      </h3>
-                      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {grouped[block].map((place) => (
-                          <PlaceCard
-                            key={place.id}
-                            place={place}
-                            isSaved={savedIds.has(place.id)}
-                            otherDays={plannedElsewhere[place.id]}
-                            onToggle={onToggleSave}
-                          />
-                        ))}
-                      </ul>
-                    </div>
-                  ),
-              )}
+              [
+                { kind: "activity", title: "Activities" },
+                { kind: "food", title: "Food" },
+              ].map(({ kind, title }) => (
+                <div key={kind}>
+                  <h3 className="text-base font-semibold text-white mb-3">
+                    {title}
+                    <span className="ml-2 text-sm font-normal text-white/45">
+                      {timeOfDay.toLowerCase()}
+                    </span>
+                  </h3>
+                  {lists[kind].length === 0 ? (
+                    <p className="text-sm text-white/50">
+                      {kind === "food"
+                        ? `No ${timeOfDay.toLowerCase()} food spots found here.`
+                        : `No ${timeOfDay.toLowerCase()} activities found for your interests. Try another time of day, or add interests with Change preferences.`}
+                    </p>
+                  ) : (
+                    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {lists[kind].map((place) => (
+                        <PlaceCard
+                          key={place.id}
+                          place={place}
+                          isSaved={savedIds.has(place.id)}
+                          otherDays={plannedElsewhere[place.id]}
+                          onToggle={onToggleSave}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
           </section>
         </>
       )}

@@ -5,7 +5,7 @@ import {
   MAX_INTEREST_QUERIES,
 } from "@/lib/placeCategories";
 
-const RESULTS_PER_QUERY = 8;
+const RESULTS_PER_QUERY = 20; // the most one Places text search returns
 
 function toPlace(result, q) {
   return {
